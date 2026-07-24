@@ -81,8 +81,9 @@ curl -X POST http://localhost:8080/api/builds \
 ```
 
 Champs : `url` (http/https, requis), `app_name` (requis), `package`
-(`com.exemple.app`, requis), `version_name` (déf. `1.0`), `version_code`
-(entier, déf. `1`).
+(`com.exemple.app`, **optionnel** — déduit du nom de l'app si absent, ex.
+« Mon Application » → `app.webview.monapplication`), `version_name` (déf. `1.0`),
+`version_code` (entier, déf. `1`).
 
 ### Suivre le statut
 

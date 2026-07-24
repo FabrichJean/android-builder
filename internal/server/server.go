@@ -79,6 +79,10 @@ func (s *Server) handleCreateBuild(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "app_name est obligatoire")
 		return
 	}
+	// Package optionnel : déduit du nom de l'app s'il n'est pas fourni.
+	if req.Package == "" {
+		req.Package = derivePackage(req.AppName)
+	}
 	if !pkgRe.MatchString(req.Package) {
 		writeErr(w, http.StatusBadRequest, "package invalide (ex: com.exemple.monapp)")
 		return
@@ -338,6 +342,26 @@ func newID() string {
 	b := make([]byte, 8)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// derivePackage construit un applicationId valide à partir du nom de l'app,
+// ex. "Mon Application !" -> "app.webview.monapplication".
+func derivePackage(name string) string {
+	var sb strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			sb.WriteRune(r)
+		}
+	}
+	slug := sb.String()
+	if len(slug) > 30 {
+		slug = slug[:30]
+	}
+	// Un segment de package doit commencer par une lettre.
+	if slug == "" || slug[0] < 'a' || slug[0] > 'z' {
+		slug = "app" + slug
+	}
+	return "app.webview." + slug
 }
 
 func sanitize(s string) string {

@@ -270,16 +270,15 @@
           <input id="name" type="text" placeholder="Mon Application" required maxlength="60" />
         </div>
 
-        <div class="field">
-          <label for="pkg">Identifiant du package <span class="hint">— minuscules, ex. com.exemple.monapp</span></label>
-          <input id="pkg" type="text" placeholder="com.exemple.monapp"
-                 pattern="[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+" required />
-        </div>
-
         <button type="button" class="adv-toggle" id="advToggle" aria-expanded="false">
           <span class="chev">▶</span> Options avancées
         </button>
         <div class="adv" id="adv">
+          <div class="field">
+            <label for="pkg">Identifiant du package <span class="hint">— déduit du nom si vide</span></label>
+            <input id="pkg" type="text" placeholder="app.webview.monapplication"
+                   pattern="[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+" />
+          </div>
           <div class="row">
             <div class="field">
               <label for="vname">Version (nom)</label>
@@ -430,15 +429,16 @@
     const payload = {
       url: $("url").value.trim(),
       app_name: $("name").value.trim(),
-      package: $("pkg").value.trim(),
     };
+    const pkg = $("pkg").value.trim();
+    if (pkg) payload.package = pkg; // sinon le serveur le déduit du nom
     const vname = $("vname").value.trim(), vcode = $("vcode").value.trim();
     if (vname) payload.version_name = vname;
     if (vcode) payload.version_code = vcode;
 
     if (!/^https?:\/\//.test(payload.url)) return fail("L'URL doit commencer par http:// ou https://");
     if (!payload.app_name) return fail("Le nom de l'application est requis.");
-    if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(payload.package)) return fail("Package invalide (ex. com.exemple.monapp).");
+    if (pkg && !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(pkg)) return fail("Package invalide (ex. com.exemple.monapp).");
 
     submit.disabled = true; submit.textContent = "Envoi…";
     try {
@@ -464,6 +464,17 @@
   });
 
   function fail(msg) { formError.textContent = msg; }
+
+  // Aperçu du package déduit (miroir de derivePackage côté serveur).
+  function derivePackage(name) {
+    let slug = name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
+    if (!slug || !/^[a-z]/.test(slug)) slug = "app" + slug;
+    return "app.webview." + slug;
+  }
+  $("name").addEventListener("input", (e) => {
+    const name = e.target.value.trim();
+    $("pkg").placeholder = name ? derivePackage(name) : "app.webview.monapplication";
+  });
 
   // Reprise du suivi temps réel au chargement pour les builds non terminés.
   render();
