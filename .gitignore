@@ -1,0 +1,12 @@
+# Go
+/server
+*.exe
+
+# Env
+.env
+
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.apk

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ce fichier est régénéré par le workflow avec les valeurs réelles.
+     Les valeurs ci-dessous ne servent que pour ouvrir le projet localement. -->
+<resources>
+    <string name="app_name">WebView App</string>
+    <string name="app_url">https://example.com</string>
+</resources>
