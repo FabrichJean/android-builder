@@ -14,3 +14,6 @@ local.properties
 # APK produits (on garde le dossier, pas son contenu)
 /releases/*
 !/releases/.gitkeep
+
+# zips de dist des exemples (générés)
+examples/*.zip
