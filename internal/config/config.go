@@ -1,9 +1,38 @@
 package config
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 )
+
+// loadDotEnv charge un fichier .env (KEY=VALUE par ligne) dans l'environnement,
+// sans écraser les variables déjà définies. Silencieux si le fichier n'existe pas.
+func loadDotEnv(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, val, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		val = strings.Trim(strings.TrimSpace(val), `"'`) // retire d'éventuels guillemets
+		if key != "" && os.Getenv(key) == "" {
+			os.Setenv(key, val)
+		}
+	}
+}
 
 // Config regroupe la configuration du serveur, lue depuis l'environnement.
 type Config struct {
@@ -19,6 +48,9 @@ type Config struct {
 // Load lit la configuration depuis les variables d'environnement et valide
 // les champs obligatoires.
 func Load() (*Config, error) {
+	// Charge .env si présent (les vraies variables d'env restent prioritaires).
+	loadDotEnv(".env")
+
 	c := &Config{
 		Port:     env("PORT", "8080"),
 		Token:    os.Getenv("GITHUB_TOKEN"),
