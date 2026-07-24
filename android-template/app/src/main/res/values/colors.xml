@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- splash_bg est réécrit par le workflow avec la couleur choisie. -->
+<resources>
+    <color name="splash_bg">#14110B</color>
+</resources>

@@ -101,8 +101,25 @@ curl -X POST http://localhost:8080/api/builds \
 
 Multipart `form-data` : `dist` (zip requis, ≤ 80 Mo), `app_name` (requis),
 `package` (optionnel), `version_name`, `version_code`. Le zip est relayé au
-workflow via une release GitHub temporaire (`dist-<build_id>`), supprimée
+workflow via une release GitHub temporaire (`assets-<build_id>`), supprimée
 automatiquement après le build.
+
+### Icône & écran de démarrage (splash)
+
+En multipart (URL ou bundle), on peut aussi personnaliser l'apparence :
+
+- `icon` : fichier **PNG** (≤ 3 Mo, idéalement carré 512×512) → devient l'icône du
+  lanceur. L'interface web fournit un **outil de recadrage/zoom** qui produit ce PNG.
+- `splash_bg` : couleur de fond de l'**écran de démarrage** au format `#RRGGBB`
+  (défaut `#14110b`). Le splash affiche l'icône centrée sur ce fond au lancement.
+
+```bash
+curl -X POST http://localhost:8080/api/builds \
+  -F app_name="Mon App" -F url="https://exemple.com" \
+  -F splash_bg="#1b2a4a" -F icon=@icon.png
+```
+
+L'interface web propose un **aperçu façon téléphone** en direct (fond + icône + nom).
 
 > Astuce : buildez votre projet avec un **chemin de base relatif** (Vite
 > `base: './'`, CRA `"homepage": "."`) pour que les assets se résolvent sous

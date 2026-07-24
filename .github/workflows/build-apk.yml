@@ -28,9 +28,17 @@ on:
         required: false
         default: "1"
       bundle:
-        description: "true = embarquer un dist (release dist-<build_id>), false = URL distante"
+        description: "true = embarquer un dist (release assets-<build_id>), false = URL distante"
         required: false
         default: "false"
+      has_icon:
+        description: "true = icône personnalisée (icon.png dans la release assets-<build_id>)"
+        required: false
+        default: "false"
+      splash_bg:
+        description: "couleur de fond du splash (#RRGGBB)"
+        required: false
+        default: "#14110b"
 
 permissions:
   contents: read
@@ -74,14 +82,36 @@ jobs:
               f.write('</resources>\n')
           PY
 
+      - name: Configurer la couleur du splash
+        env:
+          SPLASH_BG: ${{ inputs.splash_bg }}
+        run: |
+          cat > app/src/main/res/values/colors.xml <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="splash_bg">${SPLASH_BG}</color>
+          </resources>
+          EOF
+
+      - name: Icône personnalisée
+        if: ${{ inputs.has_icon == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh release download "assets-${{ inputs.build_id }}" \
+            --repo "$GITHUB_REPOSITORY" --pattern 'icon.png' --dir "$RUNNER_TEMP" --clobber
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          cp "$RUNNER_TEMP/icon.png" app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
       - name: Embarquer le dist du projet web (mode bundle)
         if: ${{ inputs.bundle == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          # Télécharge l'asset dist.zip de la release temporaire dist-<build_id>.
-          gh release download "dist-${{ inputs.build_id }}" \
+          # Télécharge l'asset dist.zip de la release temporaire assets-<build_id>.
+          gh release download "assets-${{ inputs.build_id }}" \
             --repo "$GITHUB_REPOSITORY" --pattern 'dist.zip' --dir "$RUNNER_TEMP" --clobber
           rm -rf "$RUNNER_TEMP/dist" && mkdir -p "$RUNNER_TEMP/dist"
           unzip -q "$RUNNER_TEMP/dist.zip" -d "$RUNNER_TEMP/dist"

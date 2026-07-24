@@ -55,6 +55,7 @@ type createRequest struct {
 	Package     string `json:"package"`
 	VersionName string `json:"version_name"`
 	VersionCode string `json:"version_code"`
+	SplashBg    string `json:"splash_bg"`
 }
 
 var (
@@ -64,8 +65,18 @@ var (
 	vcodeRe = regexp.MustCompile(`^[0-9]+$`)
 )
 
-// maxDistBytes borne la taille du dist uploadé (mode bundle).
-const maxDistBytes = 80 << 20 // 80 Mo
+const (
+	maxDistBytes    = 80 << 20 // 80 Mo : dist uploadé (mode bundle)
+	maxIconBytes    = 3 << 20  // 3 Mo : icône PNG
+	defaultSplashBg = "#14110b"
+)
+
+var splashRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+// isPNG vérifie la signature magique d'un PNG.
+func isPNG(b []byte) bool {
+	return len(b) >= 8 && b[0] == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G'
+}
 
 // isZip vérifie la signature magique d'un fichier zip.
 func isZip(b []byte) bool {
@@ -137,15 +148,24 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "version_code invalide (entier positif attendu)")
 		return
 	}
+	splashBg := strings.TrimSpace(req.SplashBg)
+	if splashBg == "" {
+		splashBg = defaultSplashBg
+	}
+	if !splashRe.MatchString(splashBg) {
+		writeErr(w, http.StatusBadRequest, "splash_bg invalide (attendu: #RRGGBB)")
+		return
+	}
 
 	id := newID()
 	build := &buildstore.Build{
-		ID:      id,
-		URL:     req.URL,
-		AppName: req.AppName,
-		Package: req.Package,
-		Mode:    "url",
-		Status:  buildstore.StatusPending,
+		ID:       id,
+		URL:      req.URL,
+		AppName:  req.AppName,
+		Package:  req.Package,
+		Mode:     "url",
+		SplashBg: splashBg,
+		Status:   buildstore.StatusPending,
 	}
 	s.store.Create(build)
 
@@ -157,6 +177,8 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 		"version_name": req.VersionName,
 		"version_code": req.VersionCode,
 		"bundle":       "false",
+		"has_icon":     "false",
+		"splash_bg":    splashBg,
 	}
 
 	// Heure du dispatch : sert à ne chercher que les runs créés ensuite.
@@ -179,8 +201,9 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// createBundleBuild embarque le dist d'un projet web (zip) dans l'APK.
-// Le zip est relayé au workflow via une release GitHub temporaire.
+// createBundleBuild gère les requêtes multipart : mode URL ou bundle, avec
+// éventuellement une icône PNG et une couleur de splash. Les assets binaires
+// (dist zip, icône) sont relayés au workflow via une release GitHub temporaire.
 func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(maxDistBytes); err != nil {
 		writeErr(w, http.StatusBadRequest, "formulaire multipart invalide: "+err.Error())
@@ -191,6 +214,8 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	pkg := strings.TrimSpace(r.FormValue("package"))
 	vname := strings.TrimSpace(r.FormValue("version_name"))
 	vcode := strings.TrimSpace(r.FormValue("version_code"))
+	appURL := strings.TrimSpace(r.FormValue("url"))
+	splashBg := strings.TrimSpace(r.FormValue("splash_bg"))
 
 	if appName == "" {
 		writeErr(w, http.StatusBadRequest, "app_name est obligatoire")
@@ -217,71 +242,124 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "version_code invalide (entier positif attendu)")
 		return
 	}
+	if splashBg == "" {
+		splashBg = defaultSplashBg
+	}
+	if !splashRe.MatchString(splashBg) {
+		writeErr(w, http.StatusBadRequest, "splash_bg invalide (attendu: #RRGGBB)")
+		return
+	}
 
-	file, header, err := r.FormFile("dist")
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "fichier 'dist' (zip) manquant")
+	// Dist (optionnel) : détermine le mode (bundle si présent, sinon URL).
+	var distData []byte
+	var distName string
+	if file, header, err := r.FormFile("dist"); err == nil {
+		defer file.Close()
+		distData, err = io.ReadAll(io.LimitReader(file, maxDistBytes+1))
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "lecture du dist impossible")
+			return
+		}
+		if int64(len(distData)) > maxDistBytes {
+			writeErr(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("dist trop volumineux (max %d Mo)", maxDistBytes>>20))
+			return
+		}
+		if !isZip(distData) || !zipHasIndexHTML(distData) {
+			writeErr(w, http.StatusBadRequest, "le dist doit être un .zip contenant index.html")
+			return
+		}
+		distName = header.Filename
+	}
+
+	bundle := distData != nil
+	if !bundle && !urlRe.MatchString(appURL) {
+		writeErr(w, http.StatusBadRequest, "fournis une url (http/https) ou un dist (.zip)")
 		return
 	}
-	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, maxDistBytes+1))
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "lecture du fichier impossible")
-		return
-	}
-	if int64(len(data)) > maxDistBytes {
-		writeErr(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("dist trop volumineux (max %d Mo)", maxDistBytes>>20))
-		return
-	}
-	if !isZip(data) {
-		writeErr(w, http.StatusBadRequest, "le fichier doit être un .zip contenant index.html")
-		return
-	}
-	if !zipHasIndexHTML(data) {
-		writeErr(w, http.StatusBadRequest, "aucun index.html trouvé dans le zip")
-		return
+
+	// Icône (optionnelle) : PNG.
+	var iconData []byte
+	if file, _, err := r.FormFile("icon"); err == nil {
+		defer file.Close()
+		iconData, err = io.ReadAll(io.LimitReader(file, maxIconBytes+1))
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "lecture de l'icône impossible")
+			return
+		}
+		if int64(len(iconData)) > maxIconBytes {
+			writeErr(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("icône trop volumineuse (max %d Mo)", maxIconBytes>>20))
+			return
+		}
+		if !isPNG(iconData) {
+			writeErr(w, http.StatusBadRequest, "l'icône doit être un PNG")
+			return
+		}
 	}
 
 	id := newID()
+	displayURL := appURL
+	appAssetURL := appURL
+	mode := "url"
+	if bundle {
+		mode = "bundle"
+		displayURL = distName
+		appAssetURL = "file:///android_asset/www/index.html"
+	}
 	build := &buildstore.Build{
-		ID:      id,
-		URL:     header.Filename,
-		AppName: appName,
-		Package: pkg,
-		Mode:    "bundle",
-		Status:  buildstore.StatusPending,
+		ID:       id,
+		URL:      displayURL,
+		AppName:  appName,
+		Package:  pkg,
+		Mode:     mode,
+		SplashBg: splashBg,
+		HasIcon:  iconData != nil,
+		Status:   buildstore.StatusPending,
 	}
 	s.store.Create(build)
 
-	// Relais du dist via une release temporaire.
-	tag := "dist-" + id
-	releaseID, err := s.gh.CreateRelease(r.Context(), tag, "APK dist "+id)
-	if err != nil {
-		s.failNow(w, id, "création de la release temporaire impossible: "+err.Error())
-		return
-	}
-	cleanup := func() {
-		_ = s.gh.DeleteReleaseAndTag(context.Background(), releaseID, tag)
-	}
-	if err := s.gh.UploadReleaseAsset(r.Context(), releaseID, "dist.zip", data); err != nil {
-		cleanup()
-		s.failNow(w, id, "upload du dist impossible: "+err.Error())
-		return
+	// Relais des assets binaires via une release temporaire (si nécessaire).
+	var cleanup func()
+	if bundle || iconData != nil {
+		tag := "assets-" + id
+		releaseID, err := s.gh.CreateRelease(r.Context(), tag, "APK assets "+id)
+		if err != nil {
+			s.failNow(w, id, "création de la release temporaire impossible: "+err.Error())
+			return
+		}
+		cleanup = func() { _ = s.gh.DeleteReleaseAndTag(context.Background(), releaseID, tag) }
+		if bundle {
+			if err := s.gh.UploadReleaseAsset(r.Context(), releaseID, "dist.zip", "application/zip", distData); err != nil {
+				cleanup()
+				s.failNow(w, id, "upload du dist impossible: "+err.Error())
+				return
+			}
+		}
+		if iconData != nil {
+			if err := s.gh.UploadReleaseAsset(r.Context(), releaseID, "icon.png", "image/png", iconData); err != nil {
+				cleanup()
+				s.failNow(w, id, "upload de l'icône impossible: "+err.Error())
+				return
+			}
+		}
 	}
 
 	inputs := map[string]string{
 		"build_id":     id,
-		"app_url":      "file:///android_asset/www/index.html",
+		"app_url":      appAssetURL,
 		"app_name":     appName,
 		"package_id":   pkg,
 		"version_name": vname,
 		"version_code": vcode,
-		"bundle":       "true",
+		"bundle":       boolStr(bundle),
+		"has_icon":     boolStr(iconData != nil),
+		"splash_bg":    splashBg,
 	}
 
 	dispatchedAt := time.Now()
 	if err := s.gh.Dispatch(r.Context(), s.cfg.Ref, inputs); err != nil {
-		cleanup()
+		if cleanup != nil {
+			cleanup()
+		}
 		s.failNow(w, id, "déclenchement du workflow impossible: "+err.Error())
 		return
 	}
@@ -292,6 +370,13 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 		"id":     id,
 		"status": buildstore.StatusPending,
 	})
+}
+
+func boolStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }
 
 // failNow marque un build en échec et répond une erreur HTTP.

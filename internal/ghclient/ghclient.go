@@ -264,8 +264,8 @@ func (c *Client) CreateRelease(ctx context.Context, tag, name string) (int64, er
 	return rel.ID, nil
 }
 
-// UploadReleaseAsset attache un fichier (le zip du dist) à une release.
-func (c *Client) UploadReleaseAsset(ctx context.Context, releaseID int64, name string, data []byte) error {
+// UploadReleaseAsset attache un fichier à une release (dist zip, icône png, …).
+func (c *Client) UploadReleaseAsset(ctx context.Context, releaseID int64, name, contentType string, data []byte) error {
 	url := fmt.Sprintf("https://uploads.github.com/repos/%s/%s/releases/%d/assets?name=%s",
 		c.owner, c.repo, releaseID, neturl.QueryEscape(name))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
@@ -274,7 +274,7 @@ func (c *Client) UploadReleaseAsset(ctx context.Context, releaseID int64, name s
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Content-Type", "application/zip")
+	req.Header.Set("Content-Type", contentType)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err

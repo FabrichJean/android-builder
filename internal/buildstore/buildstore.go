@@ -31,7 +31,9 @@ type Build struct {
 	URL         string    `json:"url"`
 	AppName     string    `json:"app_name"`
 	Package     string    `json:"package"`
-	Mode        string    `json:"mode,omitempty"` // "url" ou "bundle"
+	Mode        string    `json:"mode,omitempty"`      // "url" ou "bundle"
+	SplashBg    string    `json:"splash_bg,omitempty"` // couleur de fond du splash
+	HasIcon     bool      `json:"has_icon,omitempty"`  // icône personnalisée fournie
 	Status      Status    `json:"status"`
 	Error       string    `json:"error,omitempty"`
 	RunID       int64     `json:"run_id,omitempty"`

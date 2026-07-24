@@ -162,6 +162,95 @@
     min-height: 0; text-align: center;
   }
 
+  /* ---- apparence (icône + splash) ---- */
+  .appearance { display: flex; gap: 16px; align-items: stretch; }
+  .appearance-controls { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+  .icon-tile {
+    display: flex; align-items: center; gap: 12px; cursor: pointer;
+    background: #100d08; border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px; color: var(--muted); font-family: inherit; text-align: left;
+    transition: border-color .15s;
+  }
+  .icon-tile:hover { border-color: var(--border-2); }
+  .icon-img {
+    width: 46px; height: 46px; border-radius: 11px; flex: none;
+    background: linear-gradient(160deg, #e6c98a, #c9a86a);
+    background-size: cover; background-position: center;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+  }
+  .icon-edit { font-size: 13px; font-weight: 600; color: var(--text); }
+  .icon-tile:hover .icon-edit { color: var(--sand); }
+
+  .mini-label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 7px; }
+  .color-row { display: flex; gap: 8px; align-items: center; }
+  input[type=color] {
+    -webkit-appearance: none; appearance: none; border: none; cursor: pointer;
+    width: 46px; height: 40px; border-radius: 10px; background: none; padding: 0;
+  }
+  input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type=color]::-webkit-color-swatch { border: 1px solid var(--border-2); border-radius: 10px; }
+  #splashHex {
+    width: 100%; text-transform: uppercase; font-family: ui-monospace, monospace;
+    font-size: 13px; padding: 10px 12px;
+  }
+
+  .phone { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .phone-screen {
+    width: 96px; height: 190px; border-radius: 20px;
+    border: 3px solid #2a241a; background: #14110b;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; overflow: hidden; box-shadow: inset 0 0 0 2px rgba(0,0,0,.4), 0 10px 24px -12px rgba(0,0,0,.7);
+    transition: background .2s;
+  }
+  .phone-icon {
+    width: 52px; height: 52px; border-radius: 13px;
+    background: linear-gradient(160deg, #e6c98a, #c9a86a);
+    background-size: cover; background-position: center;
+    box-shadow: 0 6px 16px -6px rgba(0,0,0,.6);
+  }
+  .phone-name { font-size: 11px; font-weight: 600; color: #ece3d0; max-width: 84px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .phone-caption { font-size: 10.5px; color: var(--faint); letter-spacing: .05em; }
+
+  /* ---- modal de crop ---- */
+  .modal {
+    position: fixed; inset: 0; z-index: 20; display: none;
+    place-items: center; padding: 20px;
+    background: rgba(8,6,4,.72); backdrop-filter: blur(3px);
+  }
+  .modal.open { display: grid; }
+  .modal-card {
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border); border-radius: 16px; padding: 22px;
+    width: 100%; max-width: 340px; box-shadow: var(--shadow);
+    animation: pop .3s cubic-bezier(.2,1.2,.3,1);
+  }
+  @keyframes pop { from { transform: scale(.94); opacity: 0; } }
+  .modal-card h3 { font-size: 17px; margin-bottom: 4px; }
+  .modal-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
+  .crop-stage {
+    position: relative; width: 288px; height: 288px; max-width: 100%;
+    margin: 0 auto; border-radius: 12px; overflow: hidden; background: #0d0a06;
+    touch-action: none; cursor: grab;
+  }
+  .crop-stage:active { cursor: grabbing; }
+  #cropCanvas { display: block; width: 100%; height: 100%; }
+  .crop-frame {
+    position: absolute; inset: 0; pointer-events: none;
+    box-shadow: 0 0 0 2000px rgba(20,17,11,.55);
+    border: 2px solid rgba(224,192,125,.7); border-radius: 10px;
+  }
+  .zoom-row { display: flex; align-items: center; gap: 10px; margin: 16px 0 4px; color: var(--muted); }
+  #zoom { flex: 1; accent-color: var(--sand); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .btn-ghost, .btn-gold {
+    flex: 1; border: none; cursor: pointer; font-family: inherit;
+    font-size: 14px; font-weight: 600; padding: 11px; border-radius: 11px;
+  }
+  .btn-ghost { background: transparent; border: 1px solid var(--border-2); color: var(--muted); }
+  .btn-ghost:hover { color: var(--text); }
+  .btn-gold { background: linear-gradient(160deg, var(--sand), var(--sand-dim)); color: #201a0e; }
+
   /* ---- builds list ---- */
   .builds { margin-top: 30px; display: flex; flex-direction: column; gap: 12px; }
   .builds-empty {
@@ -313,6 +402,33 @@
           <input id="name" type="text" placeholder="Mon Application" required maxlength="60" />
         </div>
 
+        <div class="field">
+          <label>Apparence <span class="hint">— icône & écran de démarrage</span></label>
+          <div class="appearance">
+            <div class="appearance-controls">
+              <button type="button" class="icon-tile" id="iconTile" title="Choisir une icône">
+                <span class="icon-img" id="iconImg"></span>
+                <span class="icon-edit">Icône</span>
+              </button>
+              <div class="splash-ctl">
+                <span class="mini-label">Fond du splash</span>
+                <div class="color-row">
+                  <input type="color" id="splashColor" value="#14110b" />
+                  <input type="text" id="splashHex" value="#14110B" maxlength="7" spellcheck="false" />
+                </div>
+              </div>
+            </div>
+            <div class="phone" id="phone">
+              <div class="phone-screen" id="phoneScreen">
+                <span class="phone-icon" id="phoneIcon"></span>
+                <span class="phone-name" id="phoneName">Mon Application</span>
+              </div>
+              <span class="phone-caption">Aperçu du splash</span>
+            </div>
+          </div>
+          <input id="icon" type="file" accept="image/*" hidden />
+        </div>
+
         <button type="button" class="adv-toggle" id="advToggle" aria-expanded="false">
           <span class="chev">▶</span> Options avancées
         </button>
@@ -342,6 +458,27 @@
     <div class="builds" id="builds"></div>
 
     <footer>Les APK produits sont aussi enregistrés dans <code>releases/</code>.</footer>
+  </div>
+
+  <!-- modal de recadrage d'icône -->
+  <div class="modal" id="cropModal">
+    <div class="modal-card">
+      <h3>Recadrer l'icône</h3>
+      <p class="modal-sub">Déplace l'image, ajuste le zoom. L'icône sera carrée.</p>
+      <div class="crop-stage" id="cropStage">
+        <canvas id="cropCanvas" width="288" height="288"></canvas>
+        <div class="crop-frame"></div>
+      </div>
+      <div class="zoom-row">
+        <span>−</span>
+        <input type="range" id="zoom" min="1" max="4" step="0.01" value="1" />
+        <span>+</span>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="cropCancel">Annuler</button>
+        <button type="button" class="btn-gold" id="cropOk">Valider</button>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -477,26 +614,27 @@
     if (!appName) return fail("Le nom de l'application est requis.");
     if (pkg && !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(pkg)) return fail("Package invalide (ex. com.exemple.monapp).");
 
+    // Toujours en multipart : permet d'inclure icône + couleur de splash uniformément.
+    const fd = new FormData();
+    fd.append("app_name", appName);
+    if (pkg) fd.append("package", pkg);
+    if (vname) fd.append("version_name", vname);
+    if (vcode) fd.append("version_code", vcode);
+    fd.append("splash_bg", splashHex());
+    if (iconBlob) fd.append("icon", iconBlob, "icon.png");
+
     let fetchOpts, listURL;
     if (mode === "bundle") {
       const f = $("dist").files[0];
       if (!f) return fail("Sélectionne un fichier .zip contenant index.html.");
-      const fd = new FormData();
-      fd.append("app_name", appName);
-      if (pkg) fd.append("package", pkg);
-      if (vname) fd.append("version_name", vname);
-      if (vcode) fd.append("version_code", vcode);
       fd.append("dist", f);
-      fetchOpts = { method: "POST", body: fd }; // le navigateur pose le boundary
+      fetchOpts = { method: "POST", body: fd };
       listURL = f.name;
     } else {
       const url = $("url").value.trim();
       if (!/^https?:\/\//.test(url)) return fail("L'URL doit commencer par http:// ou https://");
-      const payload = { url, app_name: appName };
-      if (pkg) payload.package = pkg;
-      if (vname) payload.version_name = vname;
-      if (vcode) payload.version_code = vcode;
-      fetchOpts = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) };
+      fd.append("url", url);
+      fetchOpts = { method: "POST", body: fd };
       listURL = url;
     }
 
@@ -511,7 +649,7 @@
         url: listURL, app_name: appName, mode,
       });
       save(); render(); subscribe(data.id);
-      form.reset(); setFileName("");
+      form.reset(); setFileName(""); clearIcon(); syncSplash(); updatePreview();
     } catch (err) {
       fail(err.message);
     } finally {
@@ -520,6 +658,111 @@
   });
 
   function fail(msg) { formError.textContent = msg; }
+
+  // ---- icône + splash + aperçu ----
+  let iconBlob = null, iconURL = null;
+  const splashColor = $("splashColor"), splashHexInput = $("splashHex");
+
+  function splashHex() {
+    const v = splashHexInput.value.trim();
+    return /^#[0-9a-fA-F]{6}$/.test(v) ? v : splashColor.value;
+  }
+  function clearIcon() {
+    iconBlob = null;
+    if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; }
+    $("iconImg").style.backgroundImage = "";
+    $("phoneIcon").style.backgroundImage = "";
+  }
+  function setIcon(blob) {
+    if (iconURL) URL.revokeObjectURL(iconURL);
+    iconBlob = blob; iconURL = URL.createObjectURL(blob);
+    $("iconImg").style.backgroundImage = `url(${iconURL})`;
+    $("phoneIcon").style.backgroundImage = `url(${iconURL})`;
+  }
+  function updatePreview() {
+    $("phoneScreen").style.background = splashHex();
+    $("phoneName").textContent = $("name").value.trim() || "Mon Application";
+  }
+  function syncSplash() {
+    // aligne le champ hexa sur le sélecteur de couleur
+    splashHexInput.value = splashColor.value.toUpperCase();
+  }
+
+  splashColor.addEventListener("input", () => { syncSplash(); updatePreview(); });
+  splashHexInput.addEventListener("input", () => {
+    const v = splashHexInput.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) { splashColor.value = v; updatePreview(); }
+  });
+  $("name").addEventListener("input", updatePreview);
+
+  // --- cropper ---
+  const cropModal = $("cropModal"), cropCanvas = $("cropCanvas"), cctx = cropCanvas.getContext("2d");
+  const VIEW = 288;
+  let cImg = null, cScale = 1, cMin = 1, cx = 0, cy = 0, dragging = false, lastX = 0, lastY = 0;
+
+  $("iconTile").addEventListener("click", () => $("icon").click());
+  $("icon").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const img = new Image();
+    img.onload = () => { openCropper(img); URL.revokeObjectURL(img.src); };
+    img.onerror = () => fail("Image illisible.");
+    img.src = URL.createObjectURL(f);
+    e.target.value = ""; // permet de re-sélectionner le même fichier
+  });
+
+  function openCropper(img) {
+    cImg = img;
+    cMin = Math.max(VIEW / img.width, VIEW / img.height);
+    cScale = cMin;
+    $("zoom").min = cMin; $("zoom").max = cMin * 4; $("zoom").value = cMin;
+    cx = (VIEW - img.width * cScale) / 2;
+    cy = (VIEW - img.height * cScale) / 2;
+    drawCrop();
+    cropModal.classList.add("open");
+  }
+  function clampCrop() {
+    const w = cImg.width * cScale, h = cImg.height * cScale;
+    cx = Math.min(0, Math.max(VIEW - w, cx));
+    cy = Math.min(0, Math.max(VIEW - h, cy));
+  }
+  function drawCrop() {
+    clampCrop();
+    cctx.clearRect(0, 0, VIEW, VIEW);
+    cctx.drawImage(cImg, cx, cy, cImg.width * cScale, cImg.height * cScale);
+  }
+  $("zoom").addEventListener("input", (e) => {
+    const ns = +e.target.value, k = ns / cScale;
+    // zoom centré
+    cx = VIEW / 2 - (VIEW / 2 - cx) * k;
+    cy = VIEW / 2 - (VIEW / 2 - cy) * k;
+    cScale = ns; drawCrop();
+  });
+  function cpt(e) { const r = cropCanvas.getBoundingClientRect();
+    const s = VIEW / r.width; const p = e.touches ? e.touches[0] : e;
+    return { x: (p.clientX - r.left) * s, y: (p.clientY - r.top) * s }; }
+  function dStart(e) { dragging = true; const p = cpt(e); lastX = p.x; lastY = p.y; }
+  function dMove(e) { if (!dragging) return; e.preventDefault(); const p = cpt(e);
+    cx += p.x - lastX; cy += p.y - lastY; lastX = p.x; lastY = p.y; drawCrop(); }
+  function dEnd() { dragging = false; }
+  cropCanvas.addEventListener("mousedown", dStart);
+  window.addEventListener("mousemove", dMove);
+  window.addEventListener("mouseup", dEnd);
+  cropCanvas.addEventListener("touchstart", dStart, { passive: false });
+  cropCanvas.addEventListener("touchmove", dMove, { passive: false });
+  cropCanvas.addEventListener("touchend", dEnd);
+
+  $("cropCancel").addEventListener("click", () => cropModal.classList.remove("open"));
+  $("cropOk").addEventListener("click", () => {
+    const out = document.createElement("canvas"); out.width = out.height = 512;
+    const octx = out.getContext("2d");
+    const k = 512 / VIEW;
+    octx.drawImage(cImg, cx * k, cy * k, cImg.width * cScale * k, cImg.height * cScale * k);
+    out.toBlob((blob) => { if (blob) setIcon(blob); }, "image/png");
+    cropModal.classList.remove("open");
+  });
+
+  syncSplash(); updatePreview();
 
   // ---- bascule de mode (URL / bundle) ----
   let mode = "url";
