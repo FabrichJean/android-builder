@@ -51,6 +51,11 @@ export $(grep -v '^#' .env | xargs)   # ou: source .env
 go run ./cmd/server
 ```
 
+Puis ouvre **http://localhost:8080/** : une interface web (thème sombre sableux)
+permet de saisir une URL, un nom et un package, de lancer le build et de suivre
+son avancement jusqu'au téléchargement de l'APK. L'API reste utilisable directement
+(voir plus bas).
+
 Ou via Docker :
 
 ```bash

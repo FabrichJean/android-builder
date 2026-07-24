@@ -18,6 +18,7 @@ import (
 	"github.com/example/android-builder/internal/buildstore"
 	"github.com/example/android-builder/internal/config"
 	"github.com/example/android-builder/internal/ghclient"
+	"github.com/example/android-builder/internal/webui"
 )
 
 // Server relie l'API HTTP, le store et le client GitHub.
@@ -39,6 +40,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/builds", s.handleCreateBuild)
 	mux.HandleFunc("GET /api/builds/{id}", s.handleGetBuild)
 	mux.HandleFunc("GET /api/builds/{id}/apk", s.handleDownloadAPK)
+	// Interface web statique (index.html embarqué) sur toutes les autres routes.
+	mux.Handle("GET /", http.FileServerFS(webui.FS()))
 	return mux
 }
 
