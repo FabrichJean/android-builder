@@ -1,15 +1,17 @@
 package app.webview
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : AppCompatActivity() {
+// Activity framework pure (pas d'AppCompat) : aucune dépendance externe,
+// donc rien à télécharger ni à compiler côté bibliothèques.
+class MainActivity : Activity() {
 
     private lateinit var webView: WebView
 
@@ -31,21 +33,18 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(webView)
 
-        // Bouton retour : naviguer dans l'historique WebView plutôt que quitter.
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (webView.canGoBack()) {
-                    webView.goBack()
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
-                }
-            }
-        })
-
         if (savedInstanceState == null) {
             webView.loadUrl(getString(R.string.app_url))
         }
+    }
+
+    // Bouton retour : naviguer dans l'historique WebView plutôt que quitter.
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
+            webView.goBack()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

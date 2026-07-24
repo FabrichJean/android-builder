@@ -24,6 +24,19 @@ android {
         }
     }
 
+    // On coupe tout ce qui n'est pas nécessaire pour accélérer le build.
+    buildFeatures {
+        buildConfig = false
+        resValues = false
+        shaders = false
+        aidl = false
+        renderScript = false
+    }
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -33,7 +46,6 @@ android {
     }
 }
 
+// Aucune dépendance : WebView et Activity sont dans le framework Android.
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
 }

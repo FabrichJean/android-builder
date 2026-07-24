@@ -98,6 +98,20 @@ Chaque APK réussi est aussi écrit sur disque dans le dossier `releases/`
 (configurable via `RELEASES_DIR`), nommé `<nom-app>-<build_id>.apk`. Le endpoint
 de téléchargement sert directement ce fichier.
 
+## Performances
+
+Le workflow est optimisé pour que les builds **après le premier** soient rapides :
+
+- **App sans dépendance** : `Activity` framework pure (pas d'AppCompat/AndroidX)
+  → rien à télécharger ni à compiler côté bibliothèques.
+- **Caches Gradle persistés** entre runs par `gradle/actions/setup-gradle`
+  (dépendances + build cache + configuration cache).
+- **Compilation Kotlin réutilisée** : le code ne change pas d'un build à l'autre
+  (seules les ressources — URL, nom, package — changent), donc sa sortie est mise
+  en cache et n'est pas recompilée.
+
+En pratique : 1er build ~2-3 min (remplissage des caches), builds suivants ~1 min.
+
 ## Limites & pistes d'évolution (MVP)
 
 - **APK debug** signé avec la clé debug Android → installable, mais pas
