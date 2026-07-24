@@ -114,6 +114,8 @@ func (s *Server) handleCreateBuild(w http.ResponseWriter, r *http.Request) {
 		"version_code": req.VersionCode,
 	}
 
+	// Heure du dispatch : sert à ne chercher que les runs créés ensuite.
+	dispatchedAt := time.Now()
 	if err := s.gh.Dispatch(r.Context(), s.cfg.Ref, inputs); err != nil {
 		s.store.Update(id, func(b *buildstore.Build) {
 			b.Status = buildstore.StatusFailed
@@ -124,7 +126,7 @@ func (s *Server) handleCreateBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Suivi asynchrone : détaché du contexte de la requête HTTP.
-	go s.watch(id, runName)
+	go s.watch(id, runName, dispatchedAt)
 
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"id":     id,
@@ -133,7 +135,7 @@ func (s *Server) handleCreateBuild(w http.ResponseWriter, r *http.Request) {
 }
 
 // watch repère le run correspondant, suit son exécution puis récupère l'APK.
-func (s *Server) watch(id, runName string) {
+func (s *Server) watch(id, runName string, dispatchedAt time.Time) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -146,7 +148,7 @@ func (s *Server) watch(id, runName string) {
 			s.fail(id, "délai dépassé en attendant le démarrage du workflow")
 			return
 		}
-		r, err := s.gh.FindRunByName(ctx, runName)
+		r, err := s.gh.FindRunByName(ctx, runName, dispatchedAt)
 		if err != nil {
 			log.Warn("find run", "err", err)
 		} else if r != nil {

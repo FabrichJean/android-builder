@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 )
@@ -76,28 +77,47 @@ type Run struct {
 	HTMLURL    string `json:"html_url"`
 }
 
-// FindRunByName recherche le run le plus récent dont le nom (run-name) correspond
-// exactement à name. Renvoie nil si aucun ne correspond encore.
-func (c *Client) FindRunByName(ctx context.Context, name string) (*Run, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs?event=workflow_dispatch&per_page=30", apiBase, c.owner, c.repo)
-	resp, err := c.do(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("liste des runs a échoué (%d): %s", resp.StatusCode, strings.TrimSpace(string(b)))
-	}
-	var data struct {
-		Runs []Run `json:"workflow_runs"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, err
-	}
-	for i := range data.Runs {
-		if data.Runs[i].Name == name {
-			return &data.Runs[i], nil
+// maxRunPages limite le nombre de pages parcourues (100 runs/page).
+const maxRunPages = 5
+
+// FindRunByName recherche le run dont le nom (run-name) correspond exactement à
+// name, parmi les runs créés depuis `since`. Le filtre par date + la pagination
+// rendent la corrélation fiable même quand beaucoup de builds tournent en
+// parallèle. Renvoie nil si aucun ne correspond encore.
+func (c *Client) FindRunByName(ctx context.Context, name string, since time.Time) (*Run, error) {
+	// Marge pour absorber un éventuel décalage d'horloge entre serveur et GitHub.
+	created := since.Add(-2 * time.Minute).UTC().Format(time.RFC3339)
+
+	for page := 1; page <= maxRunPages; page++ {
+		url := fmt.Sprintf(
+			"%s/repos/%s/%s/actions/runs?event=workflow_dispatch&per_page=100&page=%d&created=%s",
+			apiBase, c.owner, c.repo, page, neturl.QueryEscape(">="+created),
+		)
+		resp, err := c.do(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		var data struct {
+			Total int   `json:"total_count"`
+			Runs  []Run `json:"workflow_runs"`
+		}
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return nil, fmt.Errorf("liste des runs a échoué (%d): %s", resp.StatusCode, strings.TrimSpace(string(b)))
+		}
+		err = json.NewDecoder(resp.Body).Decode(&data)
+		resp.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		for i := range data.Runs {
+			if data.Runs[i].Name == name {
+				return &data.Runs[i], nil
+			}
+		}
+		if len(data.Runs) < 100 {
+			break // dernière page atteinte
 		}
 	}
 	return nil, nil
