@@ -22,6 +22,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := os.MkdirAll(cfg.Releases, 0o755); err != nil {
+		log.Error("dossier releases inaccessible", "dir", cfg.Releases, "err", err)
+		os.Exit(1)
+	}
+
 	gh := ghclient.New(cfg.Token, cfg.Owner, cfg.Repo, cfg.Workflow)
 	store := buildstore.New()
 	srv := server.New(cfg, gh, store, log)

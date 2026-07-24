@@ -10,3 +10,7 @@
 **/build/
 local.properties
 *.apk
+
+# APK produits (on garde le dossier, pas son contenu)
+/releases/*
+!/releases/.gitkeep

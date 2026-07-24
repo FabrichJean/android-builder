@@ -42,6 +42,7 @@ Copier `.env.example` puis renseigner les variables :
 | `GITHUB_REPO`     | Nom du dépôt                                      | —              |
 | `GITHUB_WORKFLOW` | Fichier de workflow                              | `build-apk.yml`|
 | `GITHUB_REF`      | Branche de build                                 | `main`         |
+| `RELEASES_DIR`    | Dossier où sont écrits les APK produits          | `releases`     |
 
 ## Lancer
 
@@ -92,6 +93,10 @@ Statuts : `pending` → `building` → `success` (ou `failed`, voir champ `error
 ```bash
 curl -L -o app.apk http://localhost:8080/api/builds/a1b2c3.../apk
 ```
+
+Chaque APK réussi est aussi écrit sur disque dans le dossier `releases/`
+(configurable via `RELEASES_DIR`), nommé `<nom-app>-<build_id>.apk`. Le endpoint
+de téléchargement sert directement ce fichier.
 
 ## Limites & pistes d'évolution (MVP)
 

@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -191,8 +193,17 @@ func (s *Server) watch(id, runName string) {
 		s.fail(id, "récupération de l'APK impossible: "+err.Error())
 		return
 	}
-	s.store.SetAPK(id, apk)
-	log.Info("APK prêt", "taille", len(apk))
+
+	// 4. Écrire l'APK dans le dossier releases/.
+	b, _ := s.store.Get(id)
+	filename := fmt.Sprintf("%s-%s.apk", sanitize(b.AppName), id)
+	path := filepath.Join(s.cfg.Releases, filename)
+	if err := os.WriteFile(path, apk, 0o644); err != nil {
+		s.fail(id, "écriture de l'APK impossible: "+err.Error())
+		return
+	}
+	s.store.SetAPKPath(id, path)
+	log.Info("APK écrit", "chemin", path, "taille", len(apk))
 }
 
 func (s *Server) fail(id, msg string) {
@@ -223,7 +234,7 @@ func (s *Server) handleDownloadAPK(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, "APK pas encore prêt (statut: "+string(b.Status)+")")
 		return
 	}
-	apk, ok := s.store.APK(id)
+	path, ok := s.store.APKPath(id)
 	if !ok {
 		writeErr(w, http.StatusNotFound, "APK indisponible")
 		return
@@ -231,7 +242,7 @@ func (s *Server) handleDownloadAPK(w http.ResponseWriter, r *http.Request) {
 	filename := fmt.Sprintf("%s-%s.apk", sanitize(b.AppName), id)
 	w.Header().Set("Content-Type", "application/vnd.android.package-archive")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	w.Write(apk)
+	http.ServeFile(w, r, path)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

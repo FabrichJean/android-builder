@@ -13,6 +13,7 @@ type Config struct {
 	Repo     string // nom du dépôt contenant le workflow + le template Android
 	Workflow string // nom de fichier du workflow, ex: build-apk.yml
 	Ref      string // branche sur laquelle lancer le workflow, ex: main
+	Releases string // dossier où sont écrits les APK produits
 }
 
 // Load lit la configuration depuis les variables d'environnement et valide
@@ -25,6 +26,7 @@ func Load() (*Config, error) {
 		Repo:     os.Getenv("GITHUB_REPO"),
 		Workflow: env("GITHUB_WORKFLOW", "build-apk.yml"),
 		Ref:      env("GITHUB_REF", "main"),
+		Releases: env("RELEASES_DIR", "releases"),
 	}
 
 	var missing []string

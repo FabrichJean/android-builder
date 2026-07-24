@@ -28,10 +28,9 @@ type Build struct {
 	Error     string    `json:"error,omitempty"`
 	RunID     int64     `json:"run_id,omitempty"`
 	RunURL    string    `json:"run_url,omitempty"`
+	APKPath   string    `json:"apk_path,omitempty"` // chemin du fichier APK sur disque
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-
-	apk []byte // contenu de l'APK une fois le build réussi (non sérialisé)
 }
 
 // Store est un dépôt thread-safe de builds.
@@ -53,7 +52,7 @@ func (s *Store) Create(b *Build) {
 	s.mu.Unlock()
 }
 
-// Get renvoie une copie superficielle du build (sans l'APK).
+// Get renvoie une copie du build.
 func (s *Store) Get(id string) (*Build, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -62,19 +61,18 @@ func (s *Store) Get(id string) (*Build, bool) {
 		return nil, false
 	}
 	cp := *b
-	cp.apk = nil
 	return &cp, true
 }
 
-// APK renvoie le contenu de l'APK d'un build réussi.
-func (s *Store) APK(id string) ([]byte, bool) {
+// APKPath renvoie le chemin du fichier APK d'un build réussi.
+func (s *Store) APKPath(id string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	b, ok := s.builds[id]
-	if !ok || b.apk == nil {
-		return nil, false
+	if !ok || b.APKPath == "" {
+		return "", false
 	}
-	return b.apk, true
+	return b.APKPath, true
 }
 
 // Update applique une mutation au build sous verrou.
@@ -87,12 +85,12 @@ func (s *Store) Update(id string, fn func(*Build)) {
 	}
 }
 
-// SetAPK stocke l'APK et passe le build en succès.
-func (s *Store) SetAPK(id string, apk []byte) {
+// SetAPKPath enregistre le chemin de l'APK sur disque et passe le build en succès.
+func (s *Store) SetAPKPath(id, path string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if b, ok := s.builds[id]; ok {
-		b.apk = apk
+		b.APKPath = path
 		b.Status = StatusSuccess
 		b.UpdatedAt = time.Now()
 	}
