@@ -18,19 +18,29 @@ const (
 	StatusFailed   Status = "failed"   // échec (voir Error)
 )
 
+// Step est une étape du build telle que remontée par GitHub Actions.
+type Step struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`     // queued, in_progress, completed
+	Conclusion string `json:"conclusion"` // success, failure, skipped, ...
+}
+
 // Build représente une demande de construction d'APK.
 type Build struct {
-	ID        string    `json:"id"`
-	URL       string    `json:"url"`
-	AppName   string    `json:"app_name"`
-	Package   string    `json:"package"`
-	Status    Status    `json:"status"`
-	Error     string    `json:"error,omitempty"`
-	RunID     int64     `json:"run_id,omitempty"`
-	RunURL    string    `json:"run_url,omitempty"`
-	APKPath   string    `json:"apk_path,omitempty"` // chemin du fichier APK sur disque
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	URL         string    `json:"url"`
+	AppName     string    `json:"app_name"`
+	Package     string    `json:"package"`
+	Status      Status    `json:"status"`
+	Error       string    `json:"error,omitempty"`
+	RunID       int64     `json:"run_id,omitempty"`
+	RunURL      string    `json:"run_url,omitempty"`
+	APKPath     string    `json:"apk_path,omitempty"` // chemin du fichier APK sur disque
+	Steps       []Step    `json:"steps,omitempty"`    // étapes du build
+	Progress    int       `json:"progress"`           // 0-100
+	CurrentStep string    `json:"current_step,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Store est un dépôt thread-safe de builds.

@@ -92,6 +92,18 @@ curl http://localhost:8080/api/builds/a1b2c3...
 ```
 
 Statuts : `pending` → `building` → `success` (ou `failed`, voir champ `error`).
+Le statut inclut aussi `progress` (0-100), `current_step` et la liste des `steps`
+du run GitHub Actions.
+
+### Suivre en temps réel (SSE)
+
+```bash
+curl -N http://localhost:8080/api/builds/a1b2c3.../events
+```
+
+Flux Server-Sent Events poussant l'état complet du build (progression, étape
+courante, statut) à chaque changement, jusqu'à la fin. C'est ce que l'interface
+web utilise pour afficher la barre de progression et la liste des étapes en direct.
 
 ### Télécharger l'APK
 

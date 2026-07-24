@@ -142,6 +142,41 @@ func (c *Client) GetRun(ctx context.Context, id int64) (*Run, error) {
 	return &run, nil
 }
 
+// Step est une étape d'un job (Checkout, Setup Gradle, Build…).
+type Step struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`     // queued, in_progress, completed
+	Conclusion string `json:"conclusion"` // success, failure, skipped, ...
+	Number     int    `json:"number"`
+}
+
+// GetSteps renvoie les étapes du (premier) job du run, dans l'ordre.
+// Renvoie une liste vide tant que le job n'a pas démarré.
+func (c *Client) GetSteps(ctx context.Context, runID int64) ([]Step, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs/%d/jobs", apiBase, c.owner, c.repo, runID)
+	resp, err := c.do(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get jobs a échoué (%d): %s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	var data struct {
+		Jobs []struct {
+			Steps []Step `json:"steps"`
+		} `json:"jobs"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+	if len(data.Jobs) == 0 {
+		return nil, nil
+	}
+	return data.Jobs[0].Steps, nil
+}
+
 type artifact struct {
 	ID                 int64  `json:"id"`
 	Name               string `json:"name"`

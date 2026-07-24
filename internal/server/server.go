@@ -39,6 +39,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("POST /api/builds", s.handleCreateBuild)
 	mux.HandleFunc("GET /api/builds/{id}", s.handleGetBuild)
+	mux.HandleFunc("GET /api/builds/{id}/events", s.handleEvents)
 	mux.HandleFunc("GET /api/builds/{id}/apk", s.handleDownloadAPK)
 	// Interface web statique (index.html embarqué) sur toutes les autres routes.
 	mux.Handle("GET /", http.FileServerFS(webui.FS()))
@@ -171,14 +172,22 @@ func (s *Server) watch(id, runName string, dispatchedAt time.Time) {
 	})
 	log.Info("run repéré", "run_id", run.ID, "url", run.HTMLURL)
 
-	// 2. Attendre la fin du run.
+	// 2. Attendre la fin du run en suivant les étapes en direct.
 	for run.Status != "completed" {
 		select {
 		case <-ctx.Done():
 			s.fail(id, "délai dépassé pendant le build")
 			return
-		case <-time.After(10 * time.Second):
+		case <-time.After(4 * time.Second):
 		}
+
+		// Étapes détaillées (progression fine).
+		if steps, err := s.gh.GetSteps(ctx, run.ID); err == nil {
+			s.store.Update(id, func(b *buildstore.Build) {
+				applySteps(b, steps)
+			})
+		}
+
 		r, err := s.gh.GetRun(ctx, run.ID)
 		if err != nil {
 			log.Warn("get run", "err", err)
@@ -207,8 +216,35 @@ func (s *Server) watch(id, runName string, dispatchedAt time.Time) {
 		s.fail(id, "écriture de l'APK impossible: "+err.Error())
 		return
 	}
-	s.store.SetAPKPath(id, path)
+	s.store.Update(id, func(b *buildstore.Build) {
+		b.Progress = 100
+		b.CurrentStep = ""
+	})
+	s.store.SetAPKPath(id, path) // passe le statut à success en dernier
 	log.Info("APK écrit", "chemin", path, "taille", len(apk))
+}
+
+// applySteps met à jour les étapes, la progression et l'étape courante d'un build.
+func applySteps(b *buildstore.Build, steps []ghclient.Step) {
+	if len(steps) == 0 {
+		return
+	}
+	out := make([]buildstore.Step, 0, len(steps))
+	completed, current := 0, ""
+	for _, st := range steps {
+		out = append(out, buildstore.Step{Name: st.Name, Status: st.Status, Conclusion: st.Conclusion})
+		if st.Status == "completed" {
+			completed++
+		}
+		if st.Status == "in_progress" && current == "" {
+			current = st.Name
+		}
+	}
+	b.Steps = out
+	b.Progress = completed * 100 / len(steps)
+	if current != "" {
+		b.CurrentStep = current
+	}
 }
 
 func (s *Server) fail(id, msg string) {
@@ -226,6 +262,50 @@ func (s *Server) handleGetBuild(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, b)
+}
+
+// handleEvents diffuse en SSE l'état d'un build (progression, étapes, statut)
+// en temps réel, jusqu'à ce qu'il soit terminé ou que le client se déconnecte.
+func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeErr(w, http.StatusInternalServerError, "streaming non supporté")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	var last string
+	send := func(b *buildstore.Build) {
+		payload, _ := json.Marshal(b)
+		if string(payload) == last {
+			return
+		}
+		last = string(payload)
+		fmt.Fprintf(w, "data: %s\n\n", payload)
+		flusher.Flush()
+	}
+
+	for {
+		b, ok := s.store.Get(id)
+		if !ok {
+			fmt.Fprint(w, `data: {"status":"failed","error":"build introuvable"}`+"\n\n")
+			flusher.Flush()
+			return
+		}
+		send(b)
+		if b.Status == buildstore.StatusSuccess || b.Status == buildstore.StatusFailed {
+			return
+		}
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(time.Second):
+		}
+	}
 }
 
 func (s *Server) handleDownloadAPK(w http.ResponseWriter, r *http.Request) {
