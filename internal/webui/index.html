@@ -70,6 +70,35 @@
     box-shadow: var(--shadow);
   }
 
+  /* sélecteur de mode */
+  .seg {
+    display: flex; gap: 4px; margin-bottom: 18px;
+    background: #100d08; border: 1px solid var(--border);
+    border-radius: 11px; padding: 4px;
+  }
+  .seg button {
+    flex: 1; border: none; background: transparent; cursor: pointer;
+    color: var(--muted); font-size: 13.5px; font-weight: 550;
+    padding: 9px; border-radius: 8px; font-family: inherit;
+    transition: background .15s, color .15s;
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button.active {
+    background: var(--sand-soft); color: var(--sand);
+  }
+
+  /* zone d'upload */
+  .drop {
+    border: 1px dashed var(--border-2); border-radius: 11px;
+    padding: 20px; text-align: center; cursor: pointer;
+    color: var(--muted); font-size: 13.5px; background: #100d08;
+    transition: border-color .15s, background .15s, color .15s;
+  }
+  .drop:hover, .drop.over { border-color: var(--sand); color: var(--sand); background: var(--sand-soft); }
+  .drop strong { color: var(--text); font-weight: 600; }
+  .drop .file-name { color: var(--sand); font-weight: 600; display: block; margin-top: 6px; }
+  .drop input[type=file] { display: none; }
+
   .field { margin-bottom: 16px; }
   .field:last-of-type { margin-bottom: 0; }
   label {
@@ -260,9 +289,23 @@
 
     <div class="card">
       <form id="form" novalidate>
-        <div class="field">
+        <div class="seg" id="seg">
+          <button type="button" data-mode="url" class="active">URL distante</button>
+          <button type="button" data-mode="bundle">Projet web (dist)</button>
+        </div>
+
+        <div class="field" id="urlField">
           <label for="url">URL du site</label>
-          <input id="url" type="url" placeholder="https://exemple.com" required />
+          <input id="url" type="url" placeholder="https://exemple.com" />
+        </div>
+
+        <div class="field" id="distField" style="display:none">
+          <label>Build / dist du projet web <span class="hint">— .zip contenant index.html</span></label>
+          <label class="drop" id="drop">
+            <strong>Cliquer ou déposer</strong> un fichier .zip
+            <span class="file-name" id="fileName"></span>
+            <input id="dist" type="file" accept=".zip,application/zip" />
+          </label>
         </div>
 
         <div class="field">
@@ -371,11 +414,12 @@
       const remove = `<button class="icon-btn" data-remove="${b.id}" title="Retirer de la liste">✕</button>`;
       const err = b.status === "failed" && b.error
         ? `<p class="url" style="color:var(--err)" title="${esc(b.error)}">${esc(b.error)}</p>` : "";
+      const sub = b.mode === "bundle" ? `▣ ${esc(b.url)} · hors-ligne` : esc(b.url);
       const top = `
         <div class="top">
           <div class="info">
             <p class="name">${esc(b.app_name)}</p>
-            ${err || `<p class="url">${esc(b.url)}</p>`}
+            ${err || `<p class="url">${sub}</p>`}
           </div>
           <span class="pill ${st.cls}"><span class="dot"></span>${st.label}</span>
           <div class="actions">${download}${runLink}${remove}</div>
@@ -426,36 +470,48 @@
     e.preventDefault();
     formError.textContent = "";
 
-    const payload = {
-      url: $("url").value.trim(),
-      app_name: $("name").value.trim(),
-    };
+    const appName = $("name").value.trim();
     const pkg = $("pkg").value.trim();
-    if (pkg) payload.package = pkg; // sinon le serveur le déduit du nom
     const vname = $("vname").value.trim(), vcode = $("vcode").value.trim();
-    if (vname) payload.version_name = vname;
-    if (vcode) payload.version_code = vcode;
 
-    if (!/^https?:\/\//.test(payload.url)) return fail("L'URL doit commencer par http:// ou https://");
-    if (!payload.app_name) return fail("Le nom de l'application est requis.");
+    if (!appName) return fail("Le nom de l'application est requis.");
     if (pkg && !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(pkg)) return fail("Package invalide (ex. com.exemple.monapp).");
+
+    let fetchOpts, listURL;
+    if (mode === "bundle") {
+      const f = $("dist").files[0];
+      if (!f) return fail("Sélectionne un fichier .zip contenant index.html.");
+      const fd = new FormData();
+      fd.append("app_name", appName);
+      if (pkg) fd.append("package", pkg);
+      if (vname) fd.append("version_name", vname);
+      if (vcode) fd.append("version_code", vcode);
+      fd.append("dist", f);
+      fetchOpts = { method: "POST", body: fd }; // le navigateur pose le boundary
+      listURL = f.name;
+    } else {
+      const url = $("url").value.trim();
+      if (!/^https?:\/\//.test(url)) return fail("L'URL doit commencer par http:// ou https://");
+      const payload = { url, app_name: appName };
+      if (pkg) payload.package = pkg;
+      if (vname) payload.version_name = vname;
+      if (vcode) payload.version_code = vcode;
+      fetchOpts = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) };
+      listURL = url;
+    }
 
     submit.disabled = true; submit.textContent = "Envoi…";
     try {
-      const res = await fetch("/api/builds", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch("/api/builds", fetchOpts);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur serveur");
 
       builds.unshift({
         id: data.id, status: data.status || "pending",
-        url: payload.url, app_name: payload.app_name,
+        url: listURL, app_name: appName, mode,
       });
       save(); render(); subscribe(data.id);
-      form.reset();
+      form.reset(); setFileName("");
     } catch (err) {
       fail(err.message);
     } finally {
@@ -464,6 +520,32 @@
   });
 
   function fail(msg) { formError.textContent = msg; }
+
+  // ---- bascule de mode (URL / bundle) ----
+  let mode = "url";
+  function setFileName(name) {
+    $("fileName").textContent = name || "";
+  }
+  $("seg").addEventListener("click", (e) => {
+    const m = e.target.getAttribute("data-mode");
+    if (!m || m === mode) return;
+    mode = m;
+    [...$("seg").children].forEach(b => b.classList.toggle("active", b.getAttribute("data-mode") === m));
+    $("urlField").style.display  = m === "url" ? "" : "none";
+    $("distField").style.display = m === "bundle" ? "" : "none";
+    formError.textContent = "";
+  });
+
+  const drop = $("drop"), distInput = $("dist");
+  distInput.addEventListener("change", () => setFileName(distInput.files[0]?.name || ""));
+  ["dragover", "dragenter"].forEach(ev =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => {
+    const f = e.dataTransfer.files[0];
+    if (f) { distInput.files = e.dataTransfer.files; setFileName(f.name); }
+  });
 
   // Aperçu du package déduit (miroir de derivePackage côté serveur).
   function derivePackage(name) {

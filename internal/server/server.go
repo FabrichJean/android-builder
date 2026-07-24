@@ -2,11 +2,14 @@
 package server
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -61,7 +64,40 @@ var (
 	vcodeRe = regexp.MustCompile(`^[0-9]+$`)
 )
 
+// maxDistBytes borne la taille du dist uploadé (mode bundle).
+const maxDistBytes = 80 << 20 // 80 Mo
+
+// isZip vérifie la signature magique d'un fichier zip.
+func isZip(b []byte) bool {
+	return len(b) >= 4 && b[0] == 'P' && b[1] == 'K' && (b[2] == 3 || b[2] == 5 || b[2] == 7)
+}
+
+// zipHasIndexHTML confirme la présence d'un index.html dans l'archive.
+func zipHasIndexHTML(b []byte) bool {
+	zr, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
+	if err != nil {
+		return false
+	}
+	for _, f := range zr.File {
+		if strings.EqualFold(filepath.Base(f.Name), "index.html") {
+			return true
+		}
+	}
+	return false
+}
+
+// handleCreateBuild route selon le type de contenu :
+//   - application/json          -> mode URL (WebView sur une URL distante)
+//   - multipart/form-data       -> mode bundle (dist d'un projet web embarqué)
 func (s *Server) handleCreateBuild(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		s.createBundleBuild(w, r)
+		return
+	}
+	s.createURLBuild(w, r)
+}
+
+func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 	var req createRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "JSON invalide")
@@ -108,11 +144,11 @@ func (s *Server) handleCreateBuild(w http.ResponseWriter, r *http.Request) {
 		URL:     req.URL,
 		AppName: req.AppName,
 		Package: req.Package,
+		Mode:    "url",
 		Status:  buildstore.StatusPending,
 	}
 	s.store.Create(build)
 
-	runName := "apk-" + id
 	inputs := map[string]string{
 		"build_id":     id,
 		"app_url":      req.URL,
@@ -120,6 +156,7 @@ func (s *Server) handleCreateBuild(w http.ResponseWriter, r *http.Request) {
 		"package_id":   req.Package,
 		"version_name": req.VersionName,
 		"version_code": req.VersionCode,
+		"bundle":       "false",
 	}
 
 	// Heure du dispatch : sert à ne chercher que les runs créés ensuite.
@@ -134,7 +171,7 @@ func (s *Server) handleCreateBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Suivi asynchrone : détaché du contexte de la requête HTTP.
-	go s.watch(id, runName, dispatchedAt)
+	go s.watch(id, "apk-"+id, dispatchedAt, nil)
 
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"id":     id,
@@ -142,10 +179,138 @@ func (s *Server) handleCreateBuild(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// createBundleBuild embarque le dist d'un projet web (zip) dans l'APK.
+// Le zip est relayé au workflow via une release GitHub temporaire.
+func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(maxDistBytes); err != nil {
+		writeErr(w, http.StatusBadRequest, "formulaire multipart invalide: "+err.Error())
+		return
+	}
+
+	appName := strings.TrimSpace(r.FormValue("app_name"))
+	pkg := strings.TrimSpace(r.FormValue("package"))
+	vname := strings.TrimSpace(r.FormValue("version_name"))
+	vcode := strings.TrimSpace(r.FormValue("version_code"))
+
+	if appName == "" {
+		writeErr(w, http.StatusBadRequest, "app_name est obligatoire")
+		return
+	}
+	if pkg == "" {
+		pkg = derivePackage(appName)
+	}
+	if !pkgRe.MatchString(pkg) {
+		writeErr(w, http.StatusBadRequest, "package invalide (ex: com.exemple.monapp)")
+		return
+	}
+	if vname == "" {
+		vname = "1.0"
+	}
+	if vcode == "" {
+		vcode = "1"
+	}
+	if !vnameRe.MatchString(vname) {
+		writeErr(w, http.StatusBadRequest, "version_name invalide (autorisé: lettres, chiffres, . _ -)")
+		return
+	}
+	if !vcodeRe.MatchString(vcode) {
+		writeErr(w, http.StatusBadRequest, "version_code invalide (entier positif attendu)")
+		return
+	}
+
+	file, header, err := r.FormFile("dist")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "fichier 'dist' (zip) manquant")
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, maxDistBytes+1))
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "lecture du fichier impossible")
+		return
+	}
+	if int64(len(data)) > maxDistBytes {
+		writeErr(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("dist trop volumineux (max %d Mo)", maxDistBytes>>20))
+		return
+	}
+	if !isZip(data) {
+		writeErr(w, http.StatusBadRequest, "le fichier doit être un .zip contenant index.html")
+		return
+	}
+	if !zipHasIndexHTML(data) {
+		writeErr(w, http.StatusBadRequest, "aucun index.html trouvé dans le zip")
+		return
+	}
+
+	id := newID()
+	build := &buildstore.Build{
+		ID:      id,
+		URL:     header.Filename,
+		AppName: appName,
+		Package: pkg,
+		Mode:    "bundle",
+		Status:  buildstore.StatusPending,
+	}
+	s.store.Create(build)
+
+	// Relais du dist via une release temporaire.
+	tag := "dist-" + id
+	releaseID, err := s.gh.CreateRelease(r.Context(), tag, "APK dist "+id)
+	if err != nil {
+		s.failNow(w, id, "création de la release temporaire impossible: "+err.Error())
+		return
+	}
+	cleanup := func() {
+		_ = s.gh.DeleteReleaseAndTag(context.Background(), releaseID, tag)
+	}
+	if err := s.gh.UploadReleaseAsset(r.Context(), releaseID, "dist.zip", data); err != nil {
+		cleanup()
+		s.failNow(w, id, "upload du dist impossible: "+err.Error())
+		return
+	}
+
+	inputs := map[string]string{
+		"build_id":     id,
+		"app_url":      "file:///android_asset/www/index.html",
+		"app_name":     appName,
+		"package_id":   pkg,
+		"version_name": vname,
+		"version_code": vcode,
+		"bundle":       "true",
+	}
+
+	dispatchedAt := time.Now()
+	if err := s.gh.Dispatch(r.Context(), s.cfg.Ref, inputs); err != nil {
+		cleanup()
+		s.failNow(w, id, "déclenchement du workflow impossible: "+err.Error())
+		return
+	}
+
+	go s.watch(id, "apk-"+id, dispatchedAt, cleanup)
+
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"id":     id,
+		"status": buildstore.StatusPending,
+	})
+}
+
+// failNow marque un build en échec et répond une erreur HTTP.
+func (s *Server) failNow(w http.ResponseWriter, id, msg string) {
+	s.store.Update(id, func(b *buildstore.Build) {
+		b.Status = buildstore.StatusFailed
+		b.Error = msg
+	})
+	writeErr(w, http.StatusBadGateway, msg)
+}
+
 // watch repère le run correspondant, suit son exécution puis récupère l'APK.
-func (s *Server) watch(id, runName string, dispatchedAt time.Time) {
+// cleanup (optionnel) est exécuté à la fin, quel que soit le résultat.
+func (s *Server) watch(id, runName string, dispatchedAt time.Time, cleanup func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
+	if cleanup != nil {
+		defer cleanup()
+	}
 
 	log := s.log.With("build_id", id)
 

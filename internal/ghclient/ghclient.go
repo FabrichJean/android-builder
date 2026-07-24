@@ -235,3 +235,70 @@ func (c *Client) DownloadAPK(ctx context.Context, runID int64) ([]byte, error) {
 	}
 	return nil, fmt.Errorf("aucun .apk dans l'artifact")
 }
+
+// CreateRelease crée une release (prerelease) taguée `tag` et renvoie son id.
+// Sert de relais pour transmettre le dist d'un projet web au workflow.
+func (c *Client) CreateRelease(ctx context.Context, tag, name string) (int64, error) {
+	payload, _ := json.Marshal(map[string]any{
+		"tag_name":   tag,
+		"name":       name,
+		"prerelease": true,
+		"body":       "Asset temporaire pour un build APK (supprimé automatiquement).",
+	})
+	url := fmt.Sprintf("%s/repos/%s/%s/releases", apiBase, c.owner, c.repo)
+	resp, err := c.do(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("création de la release a échoué (%d): %s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	var rel struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+		return 0, err
+	}
+	return rel.ID, nil
+}
+
+// UploadReleaseAsset attache un fichier (le zip du dist) à une release.
+func (c *Client) UploadReleaseAsset(ctx context.Context, releaseID int64, name string, data []byte) error {
+	url := fmt.Sprintf("https://uploads.github.com/repos/%s/%s/releases/%d/assets?name=%s",
+		c.owner, c.repo, releaseID, neturl.QueryEscape(name))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/zip")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("upload de l'asset a échoué (%d): %s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	return nil
+}
+
+// DeleteReleaseAndTag supprime la release et son tag git (nettoyage).
+// Best-effort : les erreurs sont ignorées par l'appelant.
+func (c *Client) DeleteReleaseAndTag(ctx context.Context, releaseID int64, tag string) error {
+	relURL := fmt.Sprintf("%s/repos/%s/%s/releases/%d", apiBase, c.owner, c.repo, releaseID)
+	if resp, err := c.do(ctx, http.MethodDelete, relURL, nil); err == nil {
+		resp.Body.Close()
+	}
+	tagURL := fmt.Sprintf("%s/repos/%s/%s/git/refs/tags/%s", apiBase, c.owner, c.repo, neturl.PathEscape(tag))
+	resp, err := c.do(ctx, http.MethodDelete, tagURL, nil)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}

@@ -85,6 +85,29 @@ Champs : `url` (http/https, requis), `app_name` (requis), `package`
 « Mon Application » → `app.webview.monapplication`), `version_name` (déf. `1.0`),
 `version_code` (entier, déf. `1`).
 
+### Créer un build depuis un projet web (dist embarqué, hors-ligne)
+
+Au lieu d'une URL distante, on peut **uploader le `dist/` d'un projet web** (zip
+contenant `index.html`). Les fichiers sont embarqués dans l'APK
+(`assets/www/`) et chargés via `file:///android_asset/www/index.html` — l'app
+fonctionne **hors-ligne**.
+
+```bash
+curl -X POST http://localhost:8080/api/builds \
+  -F app_name="Mon SPA" \
+  -F package="com.exemple.spa" \
+  -F dist=@dist.zip
+```
+
+Multipart `form-data` : `dist` (zip requis, ≤ 80 Mo), `app_name` (requis),
+`package` (optionnel), `version_name`, `version_code`. Le zip est relayé au
+workflow via une release GitHub temporaire (`dist-<build_id>`), supprimée
+automatiquement après le build.
+
+> Astuce : buildez votre projet avec un **chemin de base relatif** (Vite
+> `base: './'`, CRA `"homepage": "."`) pour que les assets se résolvent sous
+> `file://`.
+
 ### Suivre le statut
 
 ```bash

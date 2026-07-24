@@ -28,6 +28,10 @@ class MainActivity : Activity() {
             settings.domStorageEnabled = true
             settings.loadWithOverviewMode = true
             settings.useWideViewPort = true
+            // Nécessaire pour charger un dist embarqué via file:///android_asset (mode hors-ligne).
+            settings.allowFileAccess = true
+            @Suppress("DEPRECATION")
+            settings.allowUniversalAccessFromFileURLs = true
             webViewClient = WebViewClient()
             webChromeClient = WebChromeClient()
         }

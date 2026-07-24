@@ -31,6 +31,7 @@ type Build struct {
 	URL         string    `json:"url"`
 	AppName     string    `json:"app_name"`
 	Package     string    `json:"package"`
+	Mode        string    `json:"mode,omitempty"` // "url" ou "bundle"
 	Status      Status    `json:"status"`
 	Error       string    `json:"error,omitempty"`
 	RunID       int64     `json:"run_id,omitempty"`

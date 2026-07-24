@@ -27,6 +27,10 @@ on:
         description: "versionCode (entier)"
         required: false
         default: "1"
+      bundle:
+        description: "true = embarquer un dist (release dist-<build_id>), false = URL distante"
+        required: false
+        default: "false"
 
 permissions:
   contents: read
@@ -69,6 +73,24 @@ jobs:
               f.write(f'    <string name="app_url">{url}</string>\n')
               f.write('</resources>\n')
           PY
+
+      - name: Embarquer le dist du projet web (mode bundle)
+        if: ${{ inputs.bundle == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          # Télécharge l'asset dist.zip de la release temporaire dist-<build_id>.
+          gh release download "dist-${{ inputs.build_id }}" \
+            --repo "$GITHUB_REPOSITORY" --pattern 'dist.zip' --dir "$RUNNER_TEMP" --clobber
+          rm -rf "$RUNNER_TEMP/dist" && mkdir -p "$RUNNER_TEMP/dist"
+          unzip -q "$RUNNER_TEMP/dist.zip" -d "$RUNNER_TEMP/dist"
+          # Localise le dossier contenant index.html (gère un éventuel dossier racine).
+          IDX="$(find "$RUNNER_TEMP/dist" -name index.html -print -quit)"
+          if [ -z "$IDX" ]; then echo "index.html introuvable"; exit 1; fi
+          mkdir -p app/src/main/assets/www
+          cp -R "$(dirname "$IDX")"/. app/src/main/assets/www/
+          echo "Dist embarqué : $(find app/src/main/assets/www -type f | wc -l) fichiers"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
