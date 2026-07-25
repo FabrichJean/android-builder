@@ -4,4 +4,5 @@
 <resources>
     <string name="app_name">WebView App</string>
     <string name="app_url">https://example.com</string>
+    <bool name="hide_scrollbar">false</bool>
 </resources>

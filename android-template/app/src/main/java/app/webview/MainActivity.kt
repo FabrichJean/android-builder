@@ -37,6 +37,12 @@ class MainActivity : Activity() {
             settings.allowFileAccess = true
             @Suppress("DEPRECATION")
             settings.allowUniversalAccessFromFileURLs = true
+            // Barre de défilement (option de build).
+            if (resources.getBoolean(R.bool.hide_scrollbar)) {
+                isVerticalScrollBarEnabled = false
+                isHorizontalScrollBarEnabled = false
+                overScrollMode = WebView.OVER_SCROLL_NEVER
+            }
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     // Laisse le splash visible un court instant, puis l'efface.

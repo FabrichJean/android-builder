@@ -50,12 +50,13 @@ func (s *Server) Routes() http.Handler {
 }
 
 type createRequest struct {
-	URL         string `json:"url"`
-	AppName     string `json:"app_name"`
-	Package     string `json:"package"`
-	VersionName string `json:"version_name"`
-	VersionCode string `json:"version_code"`
-	SplashBg    string `json:"splash_bg"`
+	URL           string `json:"url"`
+	AppName       string `json:"app_name"`
+	Package       string `json:"package"`
+	VersionName   string `json:"version_name"`
+	VersionCode   string `json:"version_code"`
+	SplashBg      string `json:"splash_bg"`
+	HideScrollbar bool   `json:"hide_scrollbar"`
 }
 
 var (
@@ -170,15 +171,16 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 	s.store.Create(build)
 
 	inputs := map[string]string{
-		"build_id":     id,
-		"app_url":      req.URL,
-		"app_name":     req.AppName,
-		"package_id":   req.Package,
-		"version_name": req.VersionName,
-		"version_code": req.VersionCode,
-		"bundle":       "false",
-		"has_icon":     "false",
-		"splash_bg":    splashBg,
+		"build_id":       id,
+		"app_url":        req.URL,
+		"app_name":       req.AppName,
+		"package_id":     req.Package,
+		"version_name":   req.VersionName,
+		"version_code":   req.VersionCode,
+		"bundle":         "false",
+		"has_icon":       "false",
+		"splash_bg":      splashBg,
+		"hide_scrollbar": boolStr(req.HideScrollbar),
 	}
 
 	// Heure du dispatch : sert à ne chercher que les runs créés ensuite.
@@ -216,6 +218,7 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	vcode := strings.TrimSpace(r.FormValue("version_code"))
 	appURL := strings.TrimSpace(r.FormValue("url"))
 	splashBg := strings.TrimSpace(r.FormValue("splash_bg"))
+	hideScrollbar := r.FormValue("hide_scrollbar") == "true"
 
 	if appName == "" {
 		writeErr(w, http.StatusBadRequest, "app_name est obligatoire")
@@ -344,15 +347,16 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inputs := map[string]string{
-		"build_id":     id,
-		"app_url":      appAssetURL,
-		"app_name":     appName,
-		"package_id":   pkg,
-		"version_name": vname,
-		"version_code": vcode,
-		"bundle":       boolStr(bundle),
-		"has_icon":     boolStr(iconData != nil),
-		"splash_bg":    splashBg,
+		"build_id":       id,
+		"app_url":        appAssetURL,
+		"app_name":       appName,
+		"package_id":     pkg,
+		"version_name":   vname,
+		"version_code":   vcode,
+		"bundle":         boolStr(bundle),
+		"has_icon":       boolStr(iconData != nil),
+		"splash_bg":      splashBg,
+		"hide_scrollbar": boolStr(hideScrollbar),
 	}
 
 	dispatchedAt := time.Now()

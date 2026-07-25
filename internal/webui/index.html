@@ -162,6 +162,26 @@
     min-height: 0; text-align: center;
   }
 
+  /* ---- interrupteur (toggle) ---- */
+  .switch-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    cursor: pointer; padding: 4px 0;
+  }
+  .switch-row .switch-label { font-size: 13.5px; color: var(--text); font-weight: 500; }
+  .switch-row .switch-label small { display: block; font-size: 11.5px; color: var(--faint); font-weight: 400; margin-top: 1px; }
+  .switch {
+    position: relative; flex: none; width: 42px; height: 24px; border-radius: 999px;
+    background: #100d08; border: 1px solid var(--border-2); transition: background .18s;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%; background: var(--muted);
+    transition: transform .18s, background .18s;
+  }
+  .switch-row input { position: absolute; opacity: 0; pointer-events: none; }
+  .switch-row input:checked + .switch { background: var(--sand-soft); border-color: var(--sand); }
+  .switch-row input:checked + .switch::after { transform: translateX(18px); background: var(--sand); }
+
   /* ---- apparence (icône + splash) ---- */
   .appearance { display: flex; gap: 16px; align-items: stretch; }
   .appearance-controls { flex: 1; display: flex; flex-direction: column; gap: 14px; }
@@ -448,6 +468,13 @@
               <input id="vcode" type="text" placeholder="1" pattern="[0-9]+" inputmode="numeric" />
             </div>
           </div>
+          <label class="switch-row">
+            <span class="switch-label">Masquer la barre de défilement
+              <small>Cache le scrollbar de la WebView</small>
+            </span>
+            <input type="checkbox" id="hideScrollbar" />
+            <span class="switch"></span>
+          </label>
         </div>
 
         <button type="submit" class="submit" id="submit">Générer l'APK</button>
@@ -621,6 +648,7 @@
     if (vname) fd.append("version_name", vname);
     if (vcode) fd.append("version_code", vcode);
     fd.append("splash_bg", splashHex());
+    fd.append("hide_scrollbar", $("hideScrollbar").checked ? "true" : "false");
     if (iconBlob) fd.append("icon", iconBlob, "icon.png");
 
     let fetchOpts, listURL;
