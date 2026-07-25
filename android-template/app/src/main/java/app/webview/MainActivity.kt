@@ -328,7 +328,10 @@ class MainActivity : Activity() {
                 readTimeout = 20000
                 instanceFollowRedirects = true
                 CookieManager.getInstance().getCookie(urlStr)?.let { setRequestProperty("Cookie", it) }
-                headers.forEach { (k, v) -> if (!k.equals("Range", true)) setRequestProperty(k, v) }
+                // On ne transmet pas Accept-Encoding/Range/Host : laisser HttpURLConnection
+                // gérer la compression (sinon octets gzip non décompressés -> image cassée).
+                val skip = setOf("accept-encoding", "range", "host", "connection", "content-length")
+                headers.forEach { (k, v) -> if (k.lowercase() !in skip) setRequestProperty(k, v) }
             }
             if (conn.responseCode !in 200..299) return null
             val serverCt = conn.contentType
