@@ -322,20 +322,21 @@ class MainActivity : Activity() {
 
         var conn: HttpURLConnection? = null
         return try {
-            conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 15000
-                readTimeout = 20000
-                instanceFollowRedirects = true
-                CookieManager.getInstance().getCookie(urlStr)?.let { setRequestProperty("Cookie", it) }
-                // On ne transmet pas Accept-Encoding/Range/Host : laisser HttpURLConnection
-                // gérer la compression (sinon octets gzip non décompressés -> image cassée).
-                val skip = setOf("accept-encoding", "range", "host", "connection", "content-length")
-                headers.forEach { (k, v) -> if (k.lowercase() !in skip) setRequestProperty(k, v) }
-            }
-            if (conn.responseCode !in 200..299) return null
-            val serverCt = conn.contentType
-            val bytes = conn.inputStream.use { it.readBytes() }
+            val c = URL(urlStr).openConnection() as HttpURLConnection
+            conn = c
+            c.requestMethod = "GET"
+            c.connectTimeout = 15000
+            c.readTimeout = 20000
+            c.instanceFollowRedirects = true
+            CookieManager.getInstance().getCookie(urlStr)?.let { c.setRequestProperty("Cookie", it) }
+            // On ne transmet pas Accept-Encoding/Range/Host : laisser HttpURLConnection
+            // gérer la compression (sinon octets gzip non décompressés -> image cassée).
+            val skip = setOf("accept-encoding", "range", "host", "connection", "content-length")
+            headers.forEach { (k, v) -> if (k.lowercase() !in skip) c.setRequestProperty(k, v) }
+
+            if (c.responseCode !in 200..299) return null
+            val serverCt = c.contentType
+            val bytes = c.inputStream.use { it.readBytes() }
             if (bytes.size > MAX_IMAGE_BYTES) return null
             val mime = imageMime(urlStr, serverCt, bytes) ?: return null
             WebResourceResponse(mime, null, ByteArrayInputStream(bytes)).apply {
