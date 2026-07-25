@@ -37,6 +37,13 @@ android {
         abortOnError = false
     }
 
+    // Par défaut, AAPT ignore les fichiers commençant par un point (motif ".*").
+    // On retire ce motif pour embarquer les dotfiles du dist (ex. .env de
+    // flutter_dotenv), sinon ils sont absents de l'APK.
+    androidResources {
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
