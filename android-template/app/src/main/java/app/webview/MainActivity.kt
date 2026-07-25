@@ -112,7 +112,7 @@ class MainActivity : Activity() {
                                  if(t&&(t.tagName==='IMG'||t.tagName==='SCRIPT'||t.tagName==='LINK')){
                                    var u=t.currentSrc||t.src||t.href;
                                    console.error('RES fail ['+t.tagName+']: '+u);
-                                   try{fetch(u).then(function(r){console.error('  -> HTTP '+r.status+' ct='+r.headers.get('content-type'));}).catch(function(err){console.error('  -> fetch err: '+err);});}catch(_){}
+                                   try{fetch(u).then(function(r){console.error('  -> HTTP '+r.status+' ct='+r.headers.get('content-type'));return r.arrayBuffer();}).then(function(buf){var a=new Uint8Array(buf).subarray(0,4);var hex=[].map.call(a,function(x){return ('0'+x.toString(16)).slice(-2);}).join('');var kind=(hex.slice(0,4)==='ffd8')?'JPEG ok':(hex.slice(0,8)==='89504e47')?'PNG ok':(hex.slice(0,6)==='474946')?'GIF ok':'PAS une image (chiffre?)';console.error('  -> '+buf.byteLength+'o magic='+hex+' '+kind);}).catch(function(err){console.error('  -> fetch err: '+err);});}catch(_){}
                                  } else { console.error('JS: '+e.message+' @'+e.filename+':'+e.lineno); }
                                },true);
                                window.addEventListener('unhandledrejection',function(e){var r=e.reason;console.error('Promise: '+((r&&(r.stack||r.message))||r));});
