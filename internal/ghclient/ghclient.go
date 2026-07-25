@@ -29,7 +29,9 @@ type Client struct {
 // New construit un client pour owner/repo.
 func New(token, owner, repo, workflow string) *Client {
 	return &Client{
-		http:     &http.Client{Timeout: 30 * time.Second},
+		// Timeout généreux : couvre l'upload d'un dist de plusieurs Mo et le
+		// téléchargement d'un APK. Le suivi des runs est borné par son contexte.
+		http:     &http.Client{Timeout: 10 * time.Minute},
 		token:    token,
 		owner:    owner,
 		repo:     repo,
