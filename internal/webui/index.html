@@ -33,42 +33,79 @@
     margin: 0;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     color: var(--text);
-    background:
-      radial-gradient(1100px 600px at 50% -10%, var(--bg-glow), transparent 70%),
-      var(--bg);
+    background: var(--bg);
     -webkit-font-smoothing: antialiased;
     line-height: 1.5;
-    padding: clamp(20px, 5vw, 56px) 20px 80px;
-    display: flex;
-    justify-content: center;
   }
 
-  .wrap { width: 100%; max-width: 560px; }
-
-  /* ---- header ---- */
-  header { text-align: center; margin-bottom: 34px; }
-  .mark {
-    width: 46px; height: 46px; margin: 0 auto 16px;
-    display: grid; place-items: center;
-    border-radius: 13px;
-    background: linear-gradient(160deg, var(--sand), var(--sand-dim));
-    color: #201a0e; font-size: 22px;
-    box-shadow: 0 10px 26px -10px rgba(224,192,125,0.5);
+  /* ---- hero ---- */
+  .hero {
+    position: relative;
+    padding: clamp(38px, 8vw, 88px) 20px clamp(64px, 9vw, 104px);
+    text-align: center;
+    overflow: hidden;
+    background:
+      radial-gradient(900px 520px at 50% -8%, rgba(224,192,125,0.22), transparent 60%),
+      radial-gradient(680px 460px at 14% 6%, rgba(200,90,74,0.16), transparent 55%),
+      radial-gradient(680px 460px at 86% 4%, rgba(150,110,180,0.14), transparent 55%),
+      var(--bg);
   }
-  h1 {
-    font-size: 25px; font-weight: 650; margin: 0 0 6px;
-    letter-spacing: -0.02em;
+  .hero-inner { max-width: 680px; margin: 0 auto; }
+  .pill-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 600; color: var(--sand);
+    background: rgba(224,192,125,0.10); border: 1px solid var(--border-2);
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 22px;
   }
-  .subtitle { color: var(--muted); font-size: 14.5px; margin: 0; }
+  .hero h1 {
+    font-size: clamp(26px, 5vw, 40px); font-weight: 750; letter-spacing: -0.03em;
+    margin: 0 0 10px; line-height: 1.08;
+  }
+  .hero .subtitle {
+    color: var(--muted); font-size: 15px; margin: 0 auto 28px; max-width: 470px;
+  }
 
-  /* ---- card ---- */
+  /* ---- carte de création ---- */
   .card {
     background: linear-gradient(180deg, var(--surface), var(--surface-2));
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 22px;
+    border-radius: 18px;
+    padding: 20px;
     box-shadow: var(--shadow);
+    max-width: 620px; margin: 0 auto;
+    text-align: left;
   }
+
+  /* ---- galerie ---- */
+  .gallery {
+    max-width: 1140px; margin: -42px auto 0; padding: 0 20px 80px;
+    position: relative; z-index: 2;
+  }
+  .gallery-panel {
+    background: rgba(28,24,15,0.72);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.8);
+    backdrop-filter: blur(8px);
+  }
+  .gallery-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .search-box {
+    display: flex; align-items: center; gap: 8px; flex: 1; min-width: 180px;
+    background: #100d08; border: 1px solid var(--border); border-radius: 10px; padding: 0 12px;
+  }
+  .search-box::before { content: "⌕"; color: var(--faint); font-size: 17px; }
+  .search-box input { flex: 1; min-width: 0; border: none; background: none; box-shadow: none !important; padding: 10px 0; }
+  .tabs { display: flex; gap: 4px; background: #100d08; border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+  .tab {
+    border: none; background: transparent; cursor: pointer; font-family: inherit;
+    color: var(--muted); font-size: 13px; font-weight: 550; padding: 7px 13px; border-radius: 7px;
+    transition: color .15s, background .15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--sand-soft); color: var(--sand); }
+  .gallery-foot { text-align: center; color: var(--faint); font-size: 12px; margin: 18px 0 0; }
+  .gallery-foot code { color: var(--muted); }
 
   /* sélecteur de mode */
   .seg {
@@ -278,32 +315,45 @@
   .btn-ghost:hover { color: var(--text); }
   .btn-gold { background: linear-gradient(160deg, var(--sand), var(--sand-dim)); color: #201a0e; }
 
-  /* ---- builds list ---- */
-  .builds { margin-top: 30px; display: flex; flex-direction: column; gap: 12px; }
-  .builds-empty {
-    text-align: center; color: var(--faint); font-size: 13.5px;
-    padding: 24px 0;
+  /* ---- galerie de builds (cartes) ---- */
+  .builds {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
-
-  .build {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 16px;
-    display: flex; align-items: center; gap: 14px;
-    animation: rise .3s ease;
+  .builds-empty {
+    grid-column: 1 / -1;
+    text-align: center; color: var(--faint); font-size: 13.5px;
+    padding: 44px 0;
   }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
-  .build .info { flex: 1; min-width: 0; }
-  .build .name {
-    font-size: 14.5px; font-weight: 600; margin: 0 0 2px;
+  .pcard {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    animation: rise .3s ease;
+    transition: border-color .15s, transform .15s;
+  }
+  .pcard:hover { border-color: var(--border-2); transform: translateY(-2px); }
+  .pcard-thumb { position: relative; height: 120px; display: grid; place-items: center; }
+  .pcard-initial {
+    font-size: 42px; font-weight: 800; color: rgba(255,255,255,0.92);
+    text-shadow: 0 2px 14px rgba(0,0,0,0.4);
+  }
+  .pcard-pill { position: absolute; top: 10px; left: 10px; }
+  .pcard-main { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+  .pcard-info { flex: 1; min-width: 0; }
+  .pcard-title {
+    font-size: 14px; font-weight: 650; margin: 0 0 2px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .build .url {
-    font-size: 12.5px; color: var(--muted); margin: 0;
+  .pcard-sub {
+    font-size: 12px; color: var(--muted); margin: 0;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  .pcard .progress-wrap { padding: 0 14px 14px; margin-top: 0; }
 
   .pill {
     display: inline-flex; align-items: center; gap: 6px;
@@ -396,15 +446,14 @@
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="mark">◨</div>
-      <h1>APK Builder</h1>
-      <p class="subtitle">Transforme une URL en application Android WebView.</p>
-    </header>
+  <div class="hero">
+    <div class="hero-inner">
+      <div class="pill-badge">◨ APK Builder — URL ou projet web → APK</div>
+      <h1>Quelle app on build aujourd'hui ?</h1>
+      <p class="subtitle">Transforme une URL ou un projet web (dist) en application Android — icône, splash et mode hors-ligne inclus.</p>
 
-    <div class="card">
-      <form id="form" novalidate>
+      <div class="card">
+        <form id="form" novalidate>
         <div class="seg" id="seg">
           <button type="button" data-mode="url" class="active">URL distante</button>
           <button type="button" data-mode="bundle">Projet web (dist)</button>
@@ -434,37 +483,36 @@
           <input id="name" type="text" placeholder="Mon Application" required maxlength="60" />
         </div>
 
-        <div class="field">
-          <label>Apparence <span class="hint">— icône & écran de démarrage</span></label>
-          <div class="appearance">
-            <div class="appearance-controls">
-              <button type="button" class="icon-tile" id="iconTile" title="Choisir une icône">
-                <span class="icon-img" id="iconImg"></span>
-                <span class="icon-edit">Icône</span>
-              </button>
-              <div class="splash-ctl">
-                <span class="mini-label">Fond du splash</span>
-                <div class="color-row">
-                  <input type="color" id="splashColor" value="#14110b" />
-                  <input type="text" id="splashHex" value="#14110B" maxlength="7" spellcheck="false" />
-                </div>
-              </div>
-            </div>
-            <div class="phone" id="phone">
-              <div class="phone-screen" id="phoneScreen">
-                <span class="phone-icon" id="phoneIcon"></span>
-                <span class="phone-name" id="phoneName">Mon Application</span>
-              </div>
-              <span class="phone-caption">Aperçu du splash</span>
-            </div>
-          </div>
-          <input id="icon" type="file" accept="image/*" hidden />
-        </div>
-
         <button type="button" class="adv-toggle" id="advToggle" aria-expanded="false">
-          <span class="chev">▶</span> Options avancées
+          <span class="chev">▶</span> Icône, splash &amp; options
         </button>
         <div class="adv" id="adv">
+          <div class="field">
+            <label>Apparence <span class="hint">— icône & écran de démarrage</span></label>
+            <div class="appearance">
+              <div class="appearance-controls">
+                <button type="button" class="icon-tile" id="iconTile" title="Choisir une icône">
+                  <span class="icon-img" id="iconImg"></span>
+                  <span class="icon-edit">Icône</span>
+                </button>
+                <div class="splash-ctl">
+                  <span class="mini-label">Fond du splash</span>
+                  <div class="color-row">
+                    <input type="color" id="splashColor" value="#14110b" />
+                    <input type="text" id="splashHex" value="#14110B" maxlength="7" spellcheck="false" />
+                  </div>
+                </div>
+              </div>
+              <div class="phone" id="phone">
+                <div class="phone-screen" id="phoneScreen">
+                  <span class="phone-icon" id="phoneIcon"></span>
+                  <span class="phone-name" id="phoneName">Mon Application</span>
+                </div>
+                <span class="phone-caption">Aperçu du splash</span>
+              </div>
+            </div>
+            <input id="icon" type="file" accept="image/*" hidden />
+          </div>
           <div class="field">
             <label for="pkg">Identifiant du package <span class="hint">— déduit du nom si vide</span></label>
             <input id="pkg" type="text" placeholder="app.webview.monapplication"
@@ -504,13 +552,26 @@
         </div>
 
         <button type="submit" class="submit" id="submit">Générer l'APK</button>
-        <div class="form-error" id="formError"></div>
-      </form>
+          <div class="form-error" id="formError"></div>
+        </form>
+      </div>
     </div>
+  </div>
 
-    <div class="builds" id="builds"></div>
-
-    <footer>Les APK produits sont aussi enregistrés dans <code>releases/</code>.</footer>
+  <div class="gallery">
+    <div class="gallery-panel">
+      <div class="gallery-head">
+        <label class="search-box"><input id="search" type="text" placeholder="Rechercher un build" /></label>
+        <div class="tabs" id="tabs">
+          <button type="button" class="tab active" data-filter="all">Tous</button>
+          <button type="button" class="tab" data-filter="active">En cours</button>
+          <button type="button" class="tab" data-filter="success">Prêts</button>
+          <button type="button" class="tab" data-filter="failed">Échecs</button>
+        </div>
+      </div>
+      <div class="builds" id="builds"></div>
+      <p class="gallery-foot">Les APK produits sont aussi enregistrés dans <code>releases/</code>.</p>
+    </div>
   </div>
 
   <!-- modal de recadrage d'icône -->
@@ -587,41 +648,76 @@
       </div>`;
   }
 
+  let activeFilter = "all";
+  const searchEl = $("search");
+
+  // Vignette : dégradé déterministe dérivé du nom + initiale.
+  function thumbStyle(name) {
+    const s = name || "app";
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+    return `background:linear-gradient(150deg,hsl(${h},42%,40%),hsl(${(h + 45) % 360},46%,26%))`;
+  }
+  function matchFilter(b) {
+    if (activeFilter === "active") return b.status === "pending" || b.status === "building";
+    if (activeFilter === "success") return b.status === "success";
+    if (activeFilter === "failed") return b.status === "failed";
+    return true;
+  }
+  function card(b) {
+    const st = STATUS[b.status] || STATUS.pending;
+    const active = b.status === "pending" || b.status === "building";
+    const initial = ((b.app_name || "?").trim()[0] || "?").toUpperCase();
+    const download = b.status === "success"
+      ? `<a class="icon-btn primary" href="/api/builds/${b.id}/apk" title="Télécharger l'APK" download>↓</a>` : "";
+    const runLink = b.run_url
+      ? `<a class="icon-btn" href="${esc(b.run_url)}" target="_blank" rel="noopener" title="Voir le run">↗</a>` : "";
+    const remove = `<button class="icon-btn" data-remove="${b.id}" title="Retirer de la liste">✕</button>`;
+    const failed = b.status === "failed";
+    const sub = failed && b.error ? esc(b.error)
+      : (b.mode === "bundle" ? `▣ ${esc(b.url)} · hors-ligne` : esc(b.url));
+    return `<div class="pcard">
+      <div class="pcard-thumb" style="${thumbStyle(b.app_name)}">
+        <span class="pcard-initial">${esc(initial)}</span>
+        <span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>
+      </div>
+      <div class="pcard-main">
+        <div class="pcard-info">
+          <p class="pcard-title">${esc(b.app_name)}</p>
+          <p class="pcard-sub"${failed ? ' style="color:var(--err)"' : ''} title="${esc(sub)}">${sub}</p>
+        </div>
+        <div class="actions">${download}${runLink}${remove}</div>
+      </div>
+      ${active ? renderProgress(b) : ""}
+    </div>`;
+  }
   function render() {
-    if (!builds.length) {
-      buildsEl.innerHTML = `<div class="builds-empty">Aucun build pour l'instant.</div>`;
+    const q = (searchEl && searchEl.value || "").trim().toLowerCase();
+    const list = builds.filter(b => matchFilter(b) &&
+      (!q || `${b.app_name} ${b.url}`.toLowerCase().includes(q)));
+    if (!list.length) {
+      buildsEl.innerHTML = `<div class="builds-empty">${builds.length
+        ? "Aucun build ne correspond."
+        : "Aucun build pour l'instant — crée ta première app ci-dessus."}</div>`;
       return;
     }
-    buildsEl.innerHTML = builds.map(b => {
-      const st = STATUS[b.status] || STATUS.pending;
-      const active = b.status === "pending" || b.status === "building";
-      const download = b.status === "success"
-        ? `<a class="icon-btn primary" href="/api/builds/${b.id}/apk" title="Télécharger l'APK" download>↓</a>`
-        : "";
-      const runLink = b.run_url
-        ? `<a class="icon-btn" href="${esc(b.run_url)}" target="_blank" rel="noopener" title="Voir le run">↗</a>`
-        : "";
-      const remove = `<button class="icon-btn" data-remove="${b.id}" title="Retirer de la liste">✕</button>`;
-      const err = b.status === "failed" && b.error
-        ? `<p class="url" style="color:var(--err)" title="${esc(b.error)}">${esc(b.error)}</p>` : "";
-      const sub = b.mode === "bundle" ? `▣ ${esc(b.url)} · hors-ligne` : esc(b.url);
-      const top = `
-        <div class="top">
-          <div class="info">
-            <p class="name">${esc(b.app_name)}</p>
-            ${err || `<p class="url">${sub}</p>`}
-          </div>
-          <span class="pill ${st.cls}"><span class="dot"></span>${st.label}</span>
-          <div class="actions">${download}${runLink}${remove}</div>
-        </div>`;
-      return `<div class="build${active ? " expanded" : ""}">${top}${active ? renderProgress(b) : ""}</div>`;
-    }).join("");
+    buildsEl.innerHTML = list.map(card).join("");
   }
 
   buildsEl.addEventListener("click", (e) => {
     const id = e.target.getAttribute?.("data-remove");
     if (id) { builds = builds.filter(b => b.id !== id); save(); render(); }
   });
+
+  // Onglets de filtre + recherche.
+  $("tabs").addEventListener("click", (e) => {
+    const f = e.target.getAttribute("data-filter");
+    if (!f) return;
+    activeFilter = f;
+    [...$("tabs").children].forEach(t => t.classList.toggle("active", t.getAttribute("data-filter") === f));
+    render();
+  });
+  searchEl.addEventListener("input", render);
 
   const streams = new Map();
 
