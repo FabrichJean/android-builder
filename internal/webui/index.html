@@ -98,6 +98,13 @@
   .drop strong { color: var(--text); font-weight: 600; }
   .drop .file-name { color: var(--sand); font-weight: 600; display: block; margin-top: 6px; }
   .drop input[type=file] { display: none; }
+  .drop-btns { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+  .drop-btns button {
+    border: 1px solid var(--border-2); background: rgba(224,192,125,.06);
+    color: var(--sand-dim); font-family: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 8px 14px; border-radius: 9px; cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+  }
+  .drop-btns button:hover { color: var(--sand); border-color: var(--sand); background: var(--sand-soft); }
 
   .field { margin-bottom: 16px; }
   .field:last-of-type { margin-bottom: 0; }
@@ -409,12 +416,17 @@
         </div>
 
         <div class="field" id="distField" style="display:none">
-          <label>Build / dist du projet web <span class="hint">— .zip contenant index.html</span></label>
-          <label class="drop" id="drop">
-            <strong>Cliquer ou déposer</strong> un fichier .zip
+          <label>Build / dist du projet web <span class="hint">— dossier ou .zip (doit contenir index.html)</span></label>
+          <div class="drop" id="drop">
+            <strong>Glissez un dossier ou un .zip</strong>
             <span class="file-name" id="fileName"></span>
-            <input id="dist" type="file" accept=".zip,application/zip" />
-          </label>
+            <div class="drop-btns">
+              <button type="button" id="pickDir">📁 Dossier</button>
+              <button type="button" id="pickZip">🗜 Fichier .zip</button>
+            </div>
+          </div>
+          <input id="distDir" type="file" webkitdirectory hidden />
+          <input id="dist" type="file" accept=".zip,application/zip" hidden />
         </div>
 
         <div class="field">
@@ -653,11 +665,10 @@
 
     let fetchOpts, listURL;
     if (mode === "bundle") {
-      const f = $("dist").files[0];
-      if (!f) return fail("Sélectionne un fichier .zip contenant index.html.");
-      fd.append("dist", f);
+      if (!distBlob) return fail("Choisis un dossier ou un .zip contenant index.html.");
+      fd.append("dist", distBlob, "dist.zip");
       fetchOpts = { method: "POST", body: fd };
-      listURL = f.name;
+      listURL = distName || "dist.zip";
     } else {
       const url = $("url").value.trim();
       if (!/^https?:\/\//.test(url)) return fail("L'URL doit commencer par http:// ou https://");
@@ -677,7 +688,7 @@
         url: listURL, app_name: appName, mode,
       });
       save(); render(); subscribe(data.id);
-      form.reset(); setFileName(""); clearIcon(); syncSplash(); updatePreview();
+      form.reset(); clearDist(); clearIcon(); syncSplash(); updatePreview();
     } catch (err) {
       fail(err.message);
     } finally {
@@ -807,15 +818,120 @@
     formError.textContent = "";
   });
 
-  const drop = $("drop"), distInput = $("dist");
-  distInput.addEventListener("change", () => setFileName(distInput.files[0]?.name || ""));
-  ["dragover", "dragenter"].forEach(ev =>
+  // ---- dist : dossier ou .zip ----
+  let distBlob = null, distName = "";
+  function setDist(blob, name) { distBlob = blob; distName = name; setFileName(name); }
+  function clearDist() { distBlob = null; distName = ""; setFileName(""); }
+
+  // Constructeur de ZIP (méthode "store", sans dépendance externe).
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(buf) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function makeZip(files) {
+    const enc = new TextEncoder(), parts = [], central = [];
+    let offset = 0;
+    for (const f of files) {
+      const name = enc.encode(f.path), crc = crc32(f.data), size = f.data.length;
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true);
+      lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true);
+      lh.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(lh.buffer), name, f.data);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true);
+      ch.setUint32(16, crc, true); ch.setUint32(20, size, true); ch.setUint32(24, size, true);
+      ch.setUint16(28, name.length, true); ch.setUint32(42, offset, true);
+      central.push(new Uint8Array(ch.buffer), name);
+      offset += 30 + name.length + size;
+    }
+    let cdSize = 0; for (const c of central) cdSize += c.length;
+    const eocd = new DataView(new ArrayBuffer(22));
+    eocd.setUint32(0, 0x06054b50, true);
+    eocd.setUint16(8, files.length, true); eocd.setUint16(10, files.length, true);
+    eocd.setUint32(12, cdSize, true); eocd.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, new Uint8Array(eocd.buffer)], { type: "application/zip" });
+  }
+
+  // Transforme une liste {path, file} en un zip prêt à uploader.
+  async function processDistFiles(list) {
+    const junk = (n) => { const b = n.split("/").pop(); return b === ".DS_Store" || b === "Thumbs.db" || b.startsWith("._"); };
+    const folder = (list[0]?.path.split("/")[0]) || "dist";
+    const files = [];
+    let hasIndex = false;
+    for (const e of list) {
+      if (junk(e.path)) continue;
+      const rel = e.path.split("/").slice(1).join("/"); // retire le dossier racine
+      if (!rel) continue;
+      if (/(^|\/)index\.html$/i.test(rel)) hasIndex = true;
+      files.push({ path: rel, data: new Uint8Array(await e.file.arrayBuffer()) });
+    }
+    if (!hasIndex) throw new Error("Le dossier doit contenir un index.html.");
+    return { blob: makeZip(files), folder, count: files.length };
+  }
+  async function ingest(list) {
+    if (!list.length) return;
+    formError.textContent = ""; setFileName("Préparation du zip…");
+    try {
+      const { blob, folder, count } = await processDistFiles(list);
+      setDist(blob, `${folder}/ · ${count} fichiers`);
+    } catch (err) { clearDist(); fail(err.message); }
+  }
+
+  // Parcours récursif d'une entrée déposée (drag-drop de dossier).
+  function readDirEntries(reader) {
+    return new Promise((resolve, reject) => {
+      const all = [];
+      const rd = () => reader.readEntries((es) => { if (!es.length) resolve(all); else { all.push(...es); rd(); } }, reject);
+      rd();
+    });
+  }
+  async function walkEntry(entry, prefix, out) {
+    if (entry.isFile) {
+      const file = await new Promise((res, rej) => entry.file(res, rej));
+      out.push({ path: prefix + entry.name, file });
+    } else if (entry.isDirectory) {
+      const es = await readDirEntries(entry.createReader());
+      for (const c of es) await walkEntry(c, prefix + entry.name + "/", out);
+    }
+  }
+
+  const drop = $("drop");
+  $("pickZip").addEventListener("click", () => $("dist").click());
+  $("pickDir").addEventListener("click", () => $("distDir").click());
+  $("dist").addEventListener("change", () => { const f = $("dist").files[0]; if (f) setDist(f, f.name); });
+  $("distDir").addEventListener("change", () =>
+    ingest([...$("distDir").files].map((f) => ({ path: f.webkitRelativePath || f.name, file: f }))));
+
+  ["dragover", "dragenter"].forEach((ev) =>
     drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
-  ["dragleave", "drop"].forEach(ev =>
+  ["dragleave"].forEach((ev) =>
     drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
-  drop.addEventListener("drop", (e) => {
+  drop.addEventListener("drop", async (e) => {
+    e.preventDefault(); drop.classList.remove("over");
+    const items = e.dataTransfer.items;
+    if (items && items.length && items[0].webkitGetAsEntry) {
+      const roots = [];
+      for (const it of items) { const en = it.webkitGetAsEntry(); if (en) roots.push(en); }
+      if (roots.length === 1 && roots[0].isFile && /\.zip$/i.test(roots[0].name)) {
+        const file = await new Promise((res, rej) => roots[0].file(res, rej));
+        return setDist(file, file.name);
+      }
+      if (roots.length) {
+        const collected = [];
+        for (const r of roots) await walkEntry(r, "", collected);
+        return ingest(collected);
+      }
+    }
     const f = e.dataTransfer.files[0];
-    if (f) { distInput.files = e.dataTransfer.files; setFileName(f.name); }
+    if (f && /\.zip$/i.test(f.name)) setDist(f, f.name);
+    else fail("Dépose un dossier ou un fichier .zip.");
   });
 
   // Aperçu du package déduit (miroir de derivePackage côté serveur).

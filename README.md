@@ -92,6 +92,10 @@ contenant `index.html`). Les fichiers sont embarqués dans l'APK
 (`assets/www/`) et chargés via `file:///android_asset/www/index.html` — l'app
 fonctionne **hors-ligne**.
 
+Dans l'interface, on peut fournir soit un **dossier** (sélection ou glisser-déposer
+du dossier `dist/`), soit un **.zip**. Le dossier est zippé côté navigateur (sans
+dépendance) avant l'envoi ; l'API, elle, reçoit toujours un zip.
+
 ```bash
 curl -X POST http://localhost:8080/api/builds \
   -F app_name="Mon SPA" \
