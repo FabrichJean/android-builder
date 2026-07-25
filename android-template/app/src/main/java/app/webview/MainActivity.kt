@@ -86,7 +86,14 @@ class MainActivity : Activity() {
                         // Capture les erreurs non gérées et rejets de promesses (fetch).
                         view?.evaluateJavascript(
                             """(function(){if(window.__dbg)return;window.__dbg=1;
-                               window.addEventListener('error',function(e){console.error('JS: '+e.message+' @'+e.filename+':'+e.lineno);});
+                               window.addEventListener('error',function(e){
+                                 var t=e.target||e.srcElement;
+                                 if(t&&(t.tagName==='IMG'||t.tagName==='SCRIPT'||t.tagName==='LINK')){
+                                   var u=t.currentSrc||t.src||t.href;
+                                   console.error('RES fail ['+t.tagName+']: '+u);
+                                   try{fetch(u).then(function(r){console.error('  -> HTTP '+r.status+' ct='+r.headers.get('content-type'));}).catch(function(err){console.error('  -> fetch err: '+err);});}catch(_){}
+                                 } else { console.error('JS: '+e.message+' @'+e.filename+':'+e.lineno); }
+                               },true);
                                window.addEventListener('unhandledrejection',function(e){var r=e.reason;console.error('Promise: '+((r&&(r.stack||r.message))||r));});
                             })();""",
                             null,
