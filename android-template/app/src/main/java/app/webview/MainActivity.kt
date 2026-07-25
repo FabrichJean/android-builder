@@ -1,19 +1,30 @@
 package app.webview
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.DownloadManager
+import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.content.res.AssetManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
 import android.text.method.ScrollingMovementMethod
+import android.util.Base64
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
+import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
+import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -23,7 +34,9 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.webkit.WebViewAssetLoader
+import java.io.File
 import java.io.IOException
 
 class MainActivity : Activity() {
@@ -31,6 +44,11 @@ class MainActivity : Activity() {
     private lateinit var webView: WebView
     private var splash: ViewGroup? = null
     private var splashHidden = false
+    private var pendingDownload: (() -> Unit)? = null
+
+    private companion object {
+        const val REQ_STORAGE = 4711
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,6 +120,12 @@ class MainActivity : Activity() {
                     Handler(Looper.getMainLooper()).postDelayed({ hideSplash() }, 500)
                 }
             }
+            // Téléchargements déclenchés par la page -> dossier Téléchargements.
+            setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
+                startDownload(url, userAgent, contentDisposition, mimetype)
+            }
+            addJavascriptInterface(DownloadBridge(this@MainActivity), "AndroidDownload")
+
             webChromeClient = if (console != null) object : WebChromeClient() {
                 override fun onConsoleMessage(m: ConsoleMessage): Boolean {
                     runOnUiThread {
@@ -165,6 +189,140 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    // ---- Téléchargements ----
+
+    private fun startDownload(url: String, userAgent: String?, contentDisposition: String?, mimetype: String?) {
+        when {
+            url.startsWith("blob:") -> downloadBlob(url)
+            url.startsWith("data:") -> saveDataUrl(url)
+            else -> withStoragePermission { enqueueHttp(url, userAgent, contentDisposition, mimetype) }
+        }
+    }
+
+    private fun enqueueHttp(url: String, userAgent: String?, contentDisposition: String?, mimetype: String?) {
+        try {
+            val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
+            val req = DownloadManager.Request(Uri.parse(url)).apply {
+                setMimeType(mimetype)
+                CookieManager.getInstance().getCookie(url)?.let { addRequestHeader("cookie", it) }
+                if (!userAgent.isNullOrEmpty()) addRequestHeader("User-Agent", userAgent)
+                setTitle(fileName)
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+            }
+            (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+            toast("Téléchargement de $fileName…")
+        } catch (e: Exception) {
+            toast("Téléchargement impossible : ${e.message}")
+        }
+    }
+
+    // blob: -> lu en JS (FileReader) puis renvoyé en base64 via l'interface.
+    private fun downloadBlob(blobUrl: String) {
+        val js = """
+            (function(){
+              try{
+                fetch('$blobUrl').then(function(r){return r.blob();}).then(function(b){
+                  var fr=new FileReader();
+                  fr.onloadend=function(){ AndroidDownload.saveBase64((fr.result.split(',')[1]||''), (b.type||'')); };
+                  fr.readAsDataURL(b);
+                }).catch(function(e){ AndroidDownload.onError(''+e); });
+              }catch(e){ AndroidDownload.onError(''+e); }
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(js, null)
+    }
+
+    private fun saveDataUrl(dataUrl: String) {
+        val comma = dataUrl.indexOf(',')
+        if (comma < 0) { toast("data URL invalide"); return }
+        val meta = dataUrl.substring(5, comma) // après "data:"
+        val mime = meta.substringBefore(';').ifEmpty { "application/octet-stream" }
+        val payload = dataUrl.substring(comma + 1)
+        val bytes = if (meta.contains("base64")) Base64.decode(payload, Base64.DEFAULT)
+        else Uri.decode(payload).toByteArray()
+        saveBytesToDownloads("download_${System.currentTimeMillis()}${extFromMime(mime)}", mime, bytes)
+    }
+
+    // Appelé par l'interface JS (blob).
+    fun saveBase64ToDownloads(base64: String, mime: String) {
+        try {
+            val bytes = Base64.decode(base64, Base64.DEFAULT)
+            val m = mime.ifEmpty { "application/octet-stream" }
+            saveBytesToDownloads("download_${System.currentTimeMillis()}${extFromMime(m)}", m, bytes)
+        } catch (e: Exception) {
+            toast("Téléchargement échoué : ${e.message}")
+        }
+    }
+
+    private fun saveBytesToDownloads(name: String, mime: String, bytes: ByteArray) {
+        withStoragePermission {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, name)
+                        put(MediaStore.Downloads.MIME_TYPE, mime)
+                        put(MediaStore.Downloads.IS_PENDING, 1)
+                    }
+                    val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                        ?: throw IOException("insertion MediaStore impossible")
+                    contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    values.clear()
+                    values.put(MediaStore.Downloads.IS_PENDING, 0)
+                    contentResolver.update(uri, values, null, null)
+                } else {
+                    @Suppress("DEPRECATION")
+                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    dir.mkdirs()
+                    File(dir, name).outputStream().use { it.write(bytes) }
+                }
+                toast("Enregistré dans Téléchargements : $name")
+            } catch (e: Exception) {
+                toast("Téléchargement échoué : ${e.message}")
+            }
+        }
+    }
+
+    // WRITE_EXTERNAL_STORAGE n'est requis que sur Android ≤ 9 (API < 29).
+    private fun withStoragePermission(action: () -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ||
+            checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        ) {
+            action()
+        } else {
+            pendingDownload = action
+            requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), REQ_STORAGE)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_STORAGE) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            val action = pendingDownload
+            pendingDownload = null
+            if (granted) action?.invoke() else toast("Permission de stockage refusée")
+        }
+    }
+
+    fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    private fun extFromMime(mime: String): String = when (mime.substringBefore(';').trim()) {
+        "image/png" -> ".png"
+        "image/jpeg" -> ".jpg"
+        "image/gif" -> ".gif"
+        "image/webp" -> ".webp"
+        "image/svg+xml" -> ".svg"
+        "application/pdf" -> ".pdf"
+        "text/plain" -> ".txt"
+        "text/csv" -> ".csv"
+        "application/json" -> ".json"
+        "application/zip" -> ".zip"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> ".xlsx"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> ".docx"
+        else -> ""
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
             webView.goBack()
@@ -181,6 +339,19 @@ class MainActivity : Activity() {
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         super.onRestoreInstanceState(savedInstanceState)
         webView.restoreState(savedInstanceState)
+    }
+}
+
+/** Pont JS pour récupérer les téléchargements blob: (base64 -> fichier). */
+private class DownloadBridge(private val activity: MainActivity) {
+    @JavascriptInterface
+    fun saveBase64(base64: String, type: String) {
+        activity.runOnUiThread { activity.saveBase64ToDownloads(base64, type) }
+    }
+
+    @JavascriptInterface
+    fun onError(msg: String) {
+        activity.runOnUiThread { activity.toast("Téléchargement échoué : $msg") }
     }
 }
 

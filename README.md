@@ -125,6 +125,14 @@ curl -X POST http://localhost:8080/api/builds \
 
 L'interface web propose un **aperçu façon téléphone** en direct (fond + icône + nom).
 
+### Téléchargements
+
+Les téléchargements déclenchés dans la page (liens de fichiers, `blob:`, `data:`)
+sont enregistrés dans le dossier public **Téléchargements** du téléphone, via le
+`DownloadManager` Android (avec notification). Les cookies de session sont
+transmis pour les fichiers protégés. Aucune permission n'est demandée sur
+Android 10+ ; sur Android ≤ 9, la permission de stockage est demandée à la volée.
+
 ### Autres options (avancées)
 
 - `hide_scrollbar` : `true`/`false` (défaut `false`) — masque la barre de
