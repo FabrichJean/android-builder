@@ -6,4 +6,5 @@
     <string name="app_url">https://example.com</string>
     <bool name="hide_scrollbar">false</bool>
     <bool name="debug_console">false</bool>
+    <bool name="fix_images">false</bool>
 </resources>

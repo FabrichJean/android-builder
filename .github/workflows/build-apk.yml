@@ -47,6 +47,10 @@ on:
         description: "true = console de debug à l'écran (erreurs JS/CORS/mixed content)"
         required: false
         default: "false"
+      fix_images:
+        description: "true = proxy natif des images (corrige Content-Type / CORS)"
+        required: false
+        default: "false"
 
 permissions:
   contents: read
@@ -79,6 +83,7 @@ jobs:
           APP_URL: ${{ inputs.app_url }}
           HIDE_SCROLLBAR: ${{ inputs.hide_scrollbar }}
           DEBUG_CONSOLE: ${{ inputs.debug_console }}
+          FIX_IMAGES: ${{ inputs.fix_images }}
         run: |
           python3 - <<'PY'
           import os, html
@@ -86,6 +91,7 @@ jobs:
           url  = html.escape(os.environ["APP_URL"],  quote=True)
           hide = "true" if os.environ.get("HIDE_SCROLLBAR") == "true" else "false"
           dbg  = "true" if os.environ.get("DEBUG_CONSOLE") == "true" else "false"
+          imgs = "true" if os.environ.get("FIX_IMAGES") == "true" else "false"
           with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
               f.write('<?xml version="1.0" encoding="utf-8"?>\n')
               f.write('<resources>\n')
@@ -93,6 +99,7 @@ jobs:
               f.write(f'    <string name="app_url">{url}</string>\n')
               f.write(f'    <bool name="hide_scrollbar">{hide}</bool>\n')
               f.write(f'    <bool name="debug_console">{dbg}</bool>\n')
+              f.write(f'    <bool name="fix_images">{imgs}</bool>\n')
               f.write('</resources>\n')
           PY
 

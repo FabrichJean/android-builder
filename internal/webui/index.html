@@ -494,6 +494,13 @@
             <input type="checkbox" id="debugConsole" />
             <span class="switch"></span>
           </label>
+          <label class="switch-row">
+            <span class="switch-label">Corriger les images
+              <small>Proxy natif : corrige le Content-Type / CORS des images</small>
+            </span>
+            <input type="checkbox" id="fixImages" />
+            <span class="switch"></span>
+          </label>
         </div>
 
         <button type="submit" class="submit" id="submit">Générer l'APK</button>
@@ -669,6 +676,7 @@
     fd.append("splash_bg", splashHex());
     fd.append("hide_scrollbar", $("hideScrollbar").checked ? "true" : "false");
     fd.append("debug_console", $("debugConsole").checked ? "true" : "false");
+    fd.append("fix_images", $("fixImages").checked ? "true" : "false");
     if (iconBlob) fd.append("icon", iconBlob, "icon.png");
 
     let fetchOpts, listURL;
