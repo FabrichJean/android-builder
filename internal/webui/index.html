@@ -487,6 +487,13 @@
             <input type="checkbox" id="hideScrollbar" />
             <span class="switch"></span>
           </label>
+          <label class="switch-row">
+            <span class="switch-label">Console de debug à l'écran
+              <small>Affiche les erreurs JS / CORS / mixed content</small>
+            </span>
+            <input type="checkbox" id="debugConsole" />
+            <span class="switch"></span>
+          </label>
         </div>
 
         <button type="submit" class="submit" id="submit">Générer l'APK</button>
@@ -661,6 +668,7 @@
     if (vcode) fd.append("version_code", vcode);
     fd.append("splash_bg", splashHex());
     fd.append("hide_scrollbar", $("hideScrollbar").checked ? "true" : "false");
+    fd.append("debug_console", $("debugConsole").checked ? "true" : "false");
     if (iconBlob) fd.append("icon", iconBlob, "icon.png");
 
     let fetchOpts, listURL;

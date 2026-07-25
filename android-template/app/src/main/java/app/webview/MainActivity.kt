@@ -3,13 +3,17 @@ package app.webview
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.res.AssetManager
+import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.method.ScrollingMovementMethod
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -18,6 +22,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.webkit.WebViewAssetLoader
 import java.io.IOException
 
@@ -36,6 +41,19 @@ class MainActivity : Activity() {
             .addPathHandler("/", WwwPathHandler(assets))
             .build()
 
+        // Console de debug optionnelle (affiche erreurs JS, CORS, mixed content).
+        val debug = resources.getBoolean(R.bool.debug_console)
+        val console: TextView? = if (debug) TextView(this).apply {
+            setBackgroundColor(0xCC000000.toInt())
+            setTextColor(Color.parseColor("#9be29b"))
+            typeface = Typeface.MONOSPACE
+            textSize = 9f
+            setPadding(16, 16, 16, 16)
+            movementMethod = ScrollingMovementMethod()
+            setTextIsSelectable(true)
+            text = "— console de debug —\n"
+        } else null
+
         webView = WebView(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -47,7 +65,7 @@ class MainActivity : Activity() {
             settings.useWideViewPort = true
             settings.allowFileAccess = false
             // Autorise les appels http depuis la page https interne (API en clair).
-            settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             // Barre de défilement (option de build).
             if (resources.getBoolean(R.bool.hide_scrollbar)) {
                 isVerticalScrollBarEnabled = false
@@ -64,14 +82,44 @@ class MainActivity : Activity() {
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
+                    if (console != null) {
+                        // Capture les erreurs non gérées et rejets de promesses (fetch).
+                        view?.evaluateJavascript(
+                            """(function(){if(window.__dbg)return;window.__dbg=1;
+                               window.addEventListener('error',function(e){console.error('JS: '+e.message+' @'+e.filename+':'+e.lineno);});
+                               window.addEventListener('unhandledrejection',function(e){var r=e.reason;console.error('Promise: '+((r&&(r.stack||r.message))||r));});
+                            })();""",
+                            null,
+                        )
+                    }
                     Handler(Looper.getMainLooper()).postDelayed({ hideSplash() }, 500)
                 }
             }
-            webChromeClient = WebChromeClient()
+            webChromeClient = if (console != null) object : WebChromeClient() {
+                override fun onConsoleMessage(m: ConsoleMessage): Boolean {
+                    runOnUiThread {
+                        console.append("[${m.messageLevel()}] ${m.message()}  (${m.sourceId()}:${m.lineNumber()})\n")
+                        val scroll = console.layout?.getLineTop(console.lineCount) ?: 0
+                        val pad = scroll - console.height + console.paddingTop + console.paddingBottom
+                        if (pad > 0) console.scrollTo(0, pad)
+                    }
+                    return true
+                }
+            } else WebChromeClient()
         }
 
         val root = FrameLayout(this)
         root.addView(webView)
+        if (console != null) {
+            root.addView(
+                console,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    (resources.displayMetrics.heightPixels * 0.4f).toInt(),
+                    Gravity.BOTTOM,
+                ),
+            )
+        }
         root.addView(buildSplash())
         setContentView(root)
 

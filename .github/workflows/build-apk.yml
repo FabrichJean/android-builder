@@ -43,6 +43,10 @@ on:
         description: "true = masquer la barre de défilement de la WebView"
         required: false
         default: "false"
+      debug_console:
+        description: "true = console de debug à l'écran (erreurs JS/CORS/mixed content)"
+        required: false
+        default: "false"
 
 permissions:
   contents: read
@@ -74,18 +78,21 @@ jobs:
           APP_NAME: ${{ inputs.app_name }}
           APP_URL: ${{ inputs.app_url }}
           HIDE_SCROLLBAR: ${{ inputs.hide_scrollbar }}
+          DEBUG_CONSOLE: ${{ inputs.debug_console }}
         run: |
           python3 - <<'PY'
           import os, html
           name = html.escape(os.environ["APP_NAME"], quote=True)
           url  = html.escape(os.environ["APP_URL"],  quote=True)
           hide = "true" if os.environ.get("HIDE_SCROLLBAR") == "true" else "false"
+          dbg  = "true" if os.environ.get("DEBUG_CONSOLE") == "true" else "false"
           with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
               f.write('<?xml version="1.0" encoding="utf-8"?>\n')
               f.write('<resources>\n')
               f.write(f'    <string name="app_name">{name}</string>\n')
               f.write(f'    <string name="app_url">{url}</string>\n')
               f.write(f'    <bool name="hide_scrollbar">{hide}</bool>\n')
+              f.write(f'    <bool name="debug_console">{dbg}</bool>\n')
               f.write('</resources>\n')
           PY
 

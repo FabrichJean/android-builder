@@ -57,6 +57,7 @@ type createRequest struct {
 	VersionCode   string `json:"version_code"`
 	SplashBg      string `json:"splash_bg"`
 	HideScrollbar bool   `json:"hide_scrollbar"`
+	DebugConsole  bool   `json:"debug_console"`
 }
 
 var (
@@ -181,6 +182,7 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 		"has_icon":       "false",
 		"splash_bg":      splashBg,
 		"hide_scrollbar": boolStr(req.HideScrollbar),
+		"debug_console":  boolStr(req.DebugConsole),
 	}
 
 	// Heure du dispatch : sert à ne chercher que les runs créés ensuite.
@@ -219,6 +221,7 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	appURL := strings.TrimSpace(r.FormValue("url"))
 	splashBg := strings.TrimSpace(r.FormValue("splash_bg"))
 	hideScrollbar := r.FormValue("hide_scrollbar") == "true"
+	debugConsole := r.FormValue("debug_console") == "true"
 
 	if appName == "" {
 		writeErr(w, http.StatusBadRequest, "app_name est obligatoire")
@@ -359,6 +362,7 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 		"has_icon":       boolStr(iconData != nil),
 		"splash_bg":      splashBg,
 		"hide_scrollbar": boolStr(hideScrollbar),
+		"debug_console":  boolStr(debugConsole),
 	}
 
 	dispatchedAt := time.Now()
