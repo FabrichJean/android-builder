@@ -141,11 +141,21 @@ private class WwwPathHandler(
         var clean = Uri.decode(path).trimStart('/')
         if (clean.isEmpty() || clean.endsWith("/")) clean += "index.html"
         return try {
-            val stream = assets.open("www/$clean")
-            WebResourceResponse(mimeOf(clean), null, stream)
+            open(clean)
         } catch (e: IOException) {
-            null
+            // Fallback SPA (routing par URL) : une "route" sans extension de
+            // fichier retombe sur index.html, comme "try_files $uri /index.html".
+            if (!clean.substringAfterLast('/').contains('.')) {
+                try { open("index.html") } catch (e2: IOException) { null }
+            } else {
+                null
+            }
         }
+    }
+
+    private fun open(rel: String): WebResourceResponse {
+        val stream = assets.open("www/$rel")
+        return WebResourceResponse(mimeOf(rel), null, stream)
     }
 
     private fun mimeOf(name: String): String = when (name.substringAfterLast('.').lowercase()) {
