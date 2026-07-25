@@ -306,7 +306,9 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	if bundle {
 		mode = "bundle"
 		displayURL = distName
-		appAssetURL = "file:///android_asset/www/index.html"
+		// Servi via WebViewAssetLoader (domaine virtuel https) : gère les chemins
+		// absolus des SPA et permet le chargement des modules ES.
+		appAssetURL = "https://appassets.androidplatform.net/index.html"
 	}
 	build := &buildstore.Build{
 		ID:       id,

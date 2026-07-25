@@ -46,6 +46,8 @@ android {
     }
 }
 
-// Aucune dépendance : WebView et Activity sont dans le framework Android.
 dependencies {
+    // Sert un dist embarqué via un domaine virtuel https interne (mode bundle) :
+    // gère les chemins absolus des SPA et le chargement des modules ES.
+    implementation("androidx.webkit:webkit:1.11.0")
 }

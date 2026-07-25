@@ -131,9 +131,11 @@ L'interface web propose un **aperçu façon téléphone** en direct (fond + icô
   défilement de la WebView. Disponible en JSON et en multipart, et via un
   interrupteur dans les *Options avancées* de l'interface.
 
-> Astuce : buildez votre projet avec un **chemin de base relatif** (Vite
-> `base: './'`, CRA `"homepage": "."`) pour que les assets se résolvent sous
-> `file://`.
+Le dist est servi dans l'app via un **domaine virtuel https interne**
+(`WebViewAssetLoader`), pas via `file://`. Les **chemins absolus** des SPA
+(`/assets/…`, `/logo.png`) et les **modules ES** (`<script type="module">`)
+fonctionnent donc sans configuration — un build Vite/React/Vue standard marche
+directement.
 
 ### Suivre le statut
 
