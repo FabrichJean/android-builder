@@ -328,6 +328,7 @@
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
   .pcard {
+    position: relative;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 14px;
@@ -681,34 +682,37 @@
     if (activeFilter === "failed") return b.status === "failed";
     return true;
   }
-  function card(b) {
+  function pillHTML(b) {
     const st = STATUS[b.status] || STATUS.pending;
-    const active = b.status === "pending" || b.status === "building";
+    return `<span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>`;
+  }
+  // Vignette : stable (jamais recréée sur une simple mise à jour de progression).
+  function thumbHTML(b) {
     const initial = ((b.app_name || "?").trim()[0] || "?").toUpperCase();
+    const isURL = b.mode !== "bundle" && /^https?:/.test(b.url || "");
+    const mshots = isURL ? `https://s.wordpress.com/mshots/v1/${encodeURIComponent(b.url)}?w=600&h=400` : "";
+    let inner;
+    if (b.thumbReady) {
+      inner = `<img class="pcard-shot" src="/api/builds/${b.id}/thumb" alt="" onerror="this.remove()" />`;
+    } else if (isURL) {
+      inner = `<span class="pcard-initial">${esc(initial)}</span><img class="pcard-shot" src="${mshots}" alt="" loading="lazy" onerror="this.remove()" />`;
+    } else {
+      inner = `<span class="pcard-initial">${esc(initial)}</span>`;
+    }
+    return `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}">${inner}</div>`;
+  }
+  // Corps dynamique : titre, sous-titre, actions, progression.
+  function bodyHTML(b) {
+    const active = b.status === "pending" || b.status === "building";
+    const failed = b.status === "failed";
     const download = b.status === "success"
       ? `<a class="icon-btn primary" href="/api/builds/${b.id}/apk" title="Télécharger l'APK" download>↓</a>` : "";
     const runLink = b.run_url
       ? `<a class="icon-btn" href="${esc(b.run_url)}" target="_blank" rel="noopener" title="Voir le run">↗</a>` : "";
     const remove = `<button class="icon-btn" data-remove="${b.id}" title="Retirer de la liste">✕</button>`;
-    const failed = b.status === "failed";
     const sub = failed && b.error ? esc(b.error)
       : (b.mode === "bundle" ? `▣ ${esc(b.url)} · hors-ligne` : esc(b.url));
-    const pill = `<span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>`;
-    const isURL = b.mode !== "bundle" && /^https?:/.test(b.url || "");
-    const mshots = isURL ? `https://s.wordpress.com/mshots/v1/${encodeURIComponent(b.url)}?w=600&h=400` : "";
-    let inner;
-    if (b.thumbReady) {
-      // Miniature locale déjà générée : servie depuis le cache navigateur (immuable).
-      inner = `<img class="pcard-shot" src="/api/builds/${b.id}/thumb" alt="" onerror="this.remove()" />${pill}`;
-    } else if (isURL) {
-      // En attendant la capture locale : screenshot public (URL publiques uniquement).
-      inner = `<span class="pcard-initial">${esc(initial)}</span><img class="pcard-shot" src="${mshots}" alt="" loading="lazy" onerror="this.remove()" />${pill}`;
-    } else {
-      inner = `<span class="pcard-initial">${esc(initial)}</span>${pill}`;
-    }
-    const thumb = `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}">${inner}</div>`;
-    return `<div class="pcard">
-      ${thumb}
+    return `
       <div class="pcard-main">
         <div class="pcard-info">
           <p class="pcard-title">${esc(b.app_name)}</p>
@@ -716,8 +720,23 @@
         </div>
         <div class="actions">${download}${runLink}${remove}</div>
       </div>
-      ${active ? renderProgress(b) : ""}
-    </div>`;
+      ${active ? renderProgress(b) : ""}`;
+  }
+  function card(b) {
+    return `<div class="pcard" data-card="${b.id}">${thumbHTML(b)}${pillHTML(b)}<div class="pcard-body">${bodyHTML(b)}</div></div>`;
+  }
+
+  // Met à jour UNE carte en place (pastille + corps) sans recréer la vignette.
+  function isVisible(b) {
+    const q = (searchEl && searchEl.value || "").trim().toLowerCase();
+    return matchFilter(b) && (!q || `${b.app_name} ${b.url}`.toLowerCase().includes(q));
+  }
+  function patch(b) {
+    const el = buildsEl.querySelector(`.pcard[data-card="${b.id}"]`);
+    if (!el) { if (isVisible(b)) render(); return; }
+    if (!isVisible(b)) { el.remove(); if (!buildsEl.querySelector(".pcard")) render(); return; }
+    const p = el.querySelector(".pcard-pill"); if (p) p.outerHTML = pillHTML(b);
+    const body = el.querySelector(".pcard-body"); if (body) body.innerHTML = bodyHTML(b);
   }
   function render() {
     const q = (searchEl && searchEl.value || "").trim().toLowerCase();
@@ -788,7 +807,7 @@
         current_step: data.current_step || "",
         steps: data.steps || [],
       });
-      save(); render();
+      save(); patch(b);
       if (isTerminal(b.status)) { es.close(); streams.delete(id); }
     };
     // Les erreurs de connexion sont gérées par la reconnexion auto d'EventSource.
