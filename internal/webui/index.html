@@ -43,7 +43,7 @@
     position: relative;
     padding: clamp(38px, 8vw, 88px) 20px clamp(64px, 9vw, 104px);
     text-align: center;
-    overflow: hidden;
+    overflow: visible;
     background:
       radial-gradient(900px 520px at 50% -8%, rgba(224,192,125,0.22), transparent 60%),
       radial-gradient(680px 460px at 14% 6%, rgba(200,90,74,0.16), transparent 55%),
@@ -75,6 +75,57 @@
     max-width: 620px; margin: 0 auto;
     text-align: left;
   }
+
+  /* ---- barre de prompt ---- */
+  .promptbar { position: relative; }
+  .pb-fields { margin-bottom: 14px; }
+  .pb-input { display: flex; align-items: center; gap: 10px; }
+  .pb-ic { font-size: 17px; opacity: .75; flex: none; }
+  .pb-input input {
+    border: none; background: none; box-shadow: none !important;
+    padding: 12px 0; font-size: 16px;
+  }
+  .pb-name {
+    border: none; background: none; box-shadow: none !important;
+    padding: 4px 0 6px; font-size: 14px; color: var(--text);
+  }
+  .pb-drop { display: block; }
+  .pb-drop .drop { margin-top: 4px; padding: 16px; }
+
+  .pb-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .pb-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #100d08; border: 1px solid var(--border); color: var(--muted);
+    font-family: inherit; font-size: 13px; font-weight: 550;
+    padding: 8px 12px; border-radius: 10px; cursor: pointer;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .chip:hover { color: var(--text); border-color: var(--border-2); }
+  .chip.active { color: var(--sand); border-color: var(--sand); background: var(--sand-soft); }
+  .chip-thumb {
+    width: 18px; height: 18px; border-radius: 5px; flex: none;
+    background: #1c1810; background-size: cover; background-position: center;
+    box-shadow: inset 0 0 0 1px var(--border-2);
+  }
+  .swatch { width: 16px; height: 16px; border-radius: 5px; flex: none; border: 1px solid var(--border-2); background: #14110b; }
+  .pb-submit { width: auto; margin: 0; padding: 11px 22px; }
+
+  /* popovers des puces */
+  .popover {
+    position: absolute; left: 0; right: 0; top: calc(100% + 10px);
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border-2); border-radius: 16px; padding: 18px;
+    box-shadow: var(--shadow); z-index: 25; animation: pop .18s ease;
+  }
+  .popover[hidden] { display: none; }
+  .pop-title { font-size: 13px; font-weight: 650; color: var(--sand); margin-bottom: 14px; }
+  .pop-field { margin-bottom: 14px; }
+  .pop-field:last-child { margin-bottom: 0; }
+  .popover .phone { margin-top: 14px; }
 
   /* ---- galerie ---- */
   .gallery {
@@ -495,106 +546,96 @@
       <p class="subtitle">Transforme une URL ou un projet web (dist) en application Android — icône, splash et mode hors-ligne inclus.</p>
 
       <div class="card">
-        <form id="form" novalidate>
-        <div class="seg" id="seg">
-          <button type="button" data-mode="url" class="active">URL distante</button>
-          <button type="button" data-mode="bundle">Projet web (dist)</button>
-        </div>
-
-        <div class="field" id="urlField">
-          <label for="url">URL du site</label>
-          <input id="url" type="url" placeholder="https://exemple.com" />
-        </div>
-
-        <div class="field" id="distField" style="display:none">
-          <label>Build / dist du projet web <span class="hint">— dossier ou .zip (doit contenir index.html)</span></label>
-          <div class="drop" id="drop">
-            <strong>Glissez un dossier ou un .zip</strong>
-            <span class="file-name" id="fileName"></span>
-            <div class="drop-btns">
-              <button type="button" id="pickDir">📁 Dossier</button>
-              <button type="button" id="pickZip">🗜 Fichier .zip</button>
+        <form id="form" novalidate class="promptbar">
+          <div class="pb-fields">
+            <div class="pb-input" id="urlField">
+              <span class="pb-ic">🌐</span>
+              <input id="url" type="url" placeholder="Colle une URL — https://exemple.com" />
             </div>
-          </div>
-          <input id="distDir" type="file" webkitdirectory hidden />
-          <input id="dist" type="file" accept=".zip,application/zip" hidden />
-        </div>
-
-        <div class="field">
-          <label for="name">Nom de l'application</label>
-          <input id="name" type="text" placeholder="Mon Application" required maxlength="60" />
-        </div>
-
-        <button type="button" class="adv-toggle" id="advToggle" aria-expanded="false">
-          <span class="chev">▶</span> Icône, splash &amp; options
-        </button>
-        <div class="adv" id="adv">
-          <div class="field">
-            <label>Apparence <span class="hint">— icône & écran de démarrage</span></label>
-            <div class="appearance">
-              <div class="appearance-controls">
-                <button type="button" class="icon-tile" id="iconTile" title="Choisir une icône">
-                  <span class="icon-img" id="iconImg"></span>
-                  <span class="icon-edit">Icône</span>
-                </button>
-                <div class="splash-ctl">
-                  <span class="mini-label">Fond du splash</span>
-                  <div class="color-row">
-                    <input type="color" id="splashColor" value="#14110b" />
-                    <input type="text" id="splashHex" value="#14110B" maxlength="7" spellcheck="false" />
-                  </div>
+            <div class="pb-input pb-drop" id="distField" style="display:none">
+              <div class="drop" id="drop">
+                <strong>Glisse un dossier ou un .zip</strong>
+                <span class="file-name" id="fileName"></span>
+                <div class="drop-btns">
+                  <button type="button" id="pickDir">📁 Dossier</button>
+                  <button type="button" id="pickZip">🗜 .zip</button>
                 </div>
               </div>
-              <div class="phone" id="phone">
-                <div class="phone-screen" id="phoneScreen">
-                  <span class="phone-icon" id="phoneIcon"></span>
-                  <span class="phone-name" id="phoneName">Mon Application</span>
-                </div>
-                <span class="phone-caption">Aperçu du splash</span>
-              </div>
+              <input id="distDir" type="file" webkitdirectory hidden />
+              <input id="dist" type="file" accept=".zip,application/zip" hidden />
             </div>
-            <input id="icon" type="file" accept="image/*" hidden />
+            <input id="name" type="text" class="pb-name" placeholder="Nom de l'application" required maxlength="60" />
           </div>
-          <div class="field">
-            <label for="pkg">Identifiant du package <span class="hint">— déduit du nom si vide</span></label>
-            <input id="pkg" type="text" placeholder="app.webview.monapplication"
-                   pattern="[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+" />
-          </div>
-          <div class="row">
-            <div class="field">
-              <label for="vname">Version (nom)</label>
-              <input id="vname" type="text" placeholder="1.0" pattern="[A-Za-z0-9._-]+" />
-            </div>
-            <div class="field">
-              <label for="vcode">Version (code)</label>
-              <input id="vcode" type="text" placeholder="1" pattern="[0-9]+" inputmode="numeric" />
-            </div>
-          </div>
-          <label class="switch-row">
-            <span class="switch-label">Masquer la barre de défilement
-              <small>Cache le scrollbar de la WebView</small>
-            </span>
-            <input type="checkbox" id="hideScrollbar" />
-            <span class="switch"></span>
-          </label>
-          <label class="switch-row">
-            <span class="switch-label">Console de debug à l'écran
-              <small>Affiche les erreurs JS / CORS / mixed content</small>
-            </span>
-            <input type="checkbox" id="debugConsole" />
-            <span class="switch"></span>
-          </label>
-          <label class="switch-row">
-            <span class="switch-label">Corriger les images
-              <small>Proxy natif : corrige le Content-Type / CORS des images</small>
-            </span>
-            <input type="checkbox" id="fixImages" />
-            <span class="switch"></span>
-          </label>
-        </div>
 
-        <button type="submit" class="submit" id="submit">Générer l'APK</button>
+          <div class="pb-bar">
+            <div class="pb-chips">
+              <button type="button" class="chip" id="modeChip" title="Basculer URL / projet web">🌐 URL</button>
+              <button type="button" class="chip" id="iconChip" title="Icône de l'app"><span class="chip-thumb" id="iconImg"></span>Icône</button>
+              <button type="button" class="chip" id="splashChip" title="Écran de démarrage"><span class="swatch" id="splashSwatch"></span>Splash</button>
+              <button type="button" class="chip" id="optionsChip" title="Options avancées">⚙ Options</button>
+            </div>
+            <button type="submit" class="submit pb-submit" id="submit">Générer ▸</button>
+          </div>
+
           <div class="form-error" id="formError"></div>
+
+          <!-- popover : écran de démarrage -->
+          <div class="popover" id="splashPop" hidden>
+            <div class="pop-title">Écran de démarrage</div>
+            <div class="color-row">
+              <input type="color" id="splashColor" value="#14110b" />
+              <input type="text" id="splashHex" value="#14110B" maxlength="7" spellcheck="false" />
+            </div>
+            <div class="phone" id="phone">
+              <div class="phone-screen" id="phoneScreen">
+                <span class="phone-icon" id="phoneIcon"></span>
+                <span class="phone-name" id="phoneName">Mon Application</span>
+              </div>
+              <span class="phone-caption">Aperçu</span>
+            </div>
+          </div>
+
+          <!-- popover : options avancées -->
+          <div class="popover" id="optionsPop" hidden>
+            <div class="pop-field">
+              <label for="pkg">Identifiant du package <span class="hint">— déduit du nom si vide</span></label>
+              <input id="pkg" type="text" placeholder="app.webview.monapplication"
+                     pattern="[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+" />
+            </div>
+            <div class="row">
+              <div class="pop-field">
+                <label for="vname">Version (nom)</label>
+                <input id="vname" type="text" placeholder="1.0" pattern="[A-Za-z0-9._-]+" />
+              </div>
+              <div class="pop-field">
+                <label for="vcode">Version (code)</label>
+                <input id="vcode" type="text" placeholder="1" pattern="[0-9]+" inputmode="numeric" />
+              </div>
+            </div>
+            <label class="switch-row">
+              <span class="switch-label">Masquer la barre de défilement
+                <small>Cache le scrollbar de la WebView</small>
+              </span>
+              <input type="checkbox" id="hideScrollbar" />
+              <span class="switch"></span>
+            </label>
+            <label class="switch-row">
+              <span class="switch-label">Console de debug à l'écran
+                <small>Affiche les erreurs JS / CORS / mixed content</small>
+              </span>
+              <input type="checkbox" id="debugConsole" />
+              <span class="switch"></span>
+            </label>
+            <label class="switch-row">
+              <span class="switch-label">Corriger les images
+                <small>Proxy natif : corrige le Content-Type / CORS des images</small>
+              </span>
+              <input type="checkbox" id="fixImages" />
+              <span class="switch"></span>
+            </label>
+          </div>
+
+          <input id="icon" type="file" accept="image/*" hidden />
         </form>
       </div>
     </div>
@@ -900,11 +941,24 @@
     // Les erreurs de connexion sont gérées par la reconnexion auto d'EventSource.
   }
 
-  $("advToggle").addEventListener("click", (e) => {
-    const t = e.currentTarget;
-    const open = t.getAttribute("aria-expanded") === "true";
-    t.setAttribute("aria-expanded", String(!open));
-    $("adv").classList.toggle("open", !open);
+  // ---- puces + popovers (splash, options) ----
+  const POPS = { splashPop: "splashChip", optionsPop: "optionsChip" };
+  function closePops() {
+    for (const [pop, chip] of Object.entries(POPS)) {
+      $(pop).hidden = true;
+      $(chip).classList.remove("active");
+    }
+  }
+  function togglePop(popId) {
+    const willOpen = $(popId).hidden;
+    closePops();
+    if (willOpen) { $(popId).hidden = false; $(POPS[popId]).classList.add("active"); }
+  }
+  $("splashChip").addEventListener("click", (e) => { e.stopPropagation(); togglePop("splashPop"); });
+  $("optionsChip").addEventListener("click", (e) => { e.stopPropagation(); togglePop("optionsPop"); });
+  // Clic en dehors d'un popover/puce -> on ferme.
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".popover") && !e.target.closest(".chip")) closePops();
   });
 
   form.addEventListener("submit", async (e) => {
@@ -980,16 +1034,19 @@
     if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; }
     $("iconImg").style.backgroundImage = "";
     $("phoneIcon").style.backgroundImage = "";
+    $("iconChip").classList.remove("active");
   }
   function setIcon(blob) {
     if (iconURL) URL.revokeObjectURL(iconURL);
     iconBlob = blob; iconURL = URL.createObjectURL(blob);
     $("iconImg").style.backgroundImage = `url(${iconURL})`;
     $("phoneIcon").style.backgroundImage = `url(${iconURL})`;
+    $("iconChip").classList.add("active");
   }
   function updatePreview() {
     $("phoneScreen").style.background = splashHex();
     $("phoneName").textContent = $("name").value.trim() || "Mon Application";
+    $("splashSwatch").style.background = splashHex();
   }
   function syncSplash() {
     // aligne le champ hexa sur le sélecteur de couleur
@@ -1008,7 +1065,7 @@
   const VIEW = 288;
   let cImg = null, cScale = 1, cMin = 1, cx = 0, cy = 0, dragging = false, lastX = 0, lastY = 0;
 
-  $("iconTile").addEventListener("click", () => $("icon").click());
+  $("iconChip").addEventListener("click", () => $("icon").click());
   $("icon").addEventListener("change", (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -1076,20 +1133,19 @@
 
   syncSplash(); updatePreview();
 
-  // ---- bascule de mode (URL / bundle) ----
+  // ---- bascule de mode (URL / projet web), via la puce ----
   let mode = "url";
   function setFileName(name) {
     $("fileName").textContent = name || "";
   }
-  $("seg").addEventListener("click", (e) => {
-    const m = e.target.getAttribute("data-mode");
-    if (!m || m === mode) return;
+  function setMode(m) {
     mode = m;
-    [...$("seg").children].forEach(b => b.classList.toggle("active", b.getAttribute("data-mode") === m));
-    $("urlField").style.display  = m === "url" ? "" : "none";
+    $("modeChip").innerHTML = m === "url" ? "🌐 URL" : "📁 Projet web";
+    $("urlField").style.display = m === "url" ? "" : "none";
     $("distField").style.display = m === "bundle" ? "" : "none";
     formError.textContent = "";
-  });
+  }
+  $("modeChip").addEventListener("click", () => setMode(mode === "url" ? "bundle" : "url"));
 
   // ---- dist : dossier ou .zip ----
   let distBlob = null, distName = "", distIconPreview = null;
