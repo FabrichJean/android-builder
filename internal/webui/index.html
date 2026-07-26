@@ -343,8 +343,13 @@
     text-shadow: 0 2px 14px rgba(0,0,0,0.4);
   }
   .pcard-icon {
-    width: 58px; height: 58px; border-radius: 15px;
+    width: 58px; height: 58px; border-radius: 15px; object-fit: contain;
     box-shadow: 0 8px 20px -8px rgba(0,0,0,0.65);
+  }
+  .pcard-fav {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 64px; height: 64px; padding: 11px; border-radius: 16px;
+    background: rgba(14,11,6,0.85);
   }
   .pcard-pill { position: absolute; top: 10px; left: 10px; }
   .pcard-main { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
@@ -689,9 +694,18 @@
     const sub = failed && b.error ? esc(b.error)
       : (b.mode === "bundle" ? `▣ ${esc(b.url)} · hors-ligne` : esc(b.url));
     const pill = `<span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>`;
-    const thumb = b.icon
-      ? `<div class="pcard-thumb" style="background:${esc(b.splash || '#14110b')}"><img class="pcard-icon" src="${b.icon}" alt="" />${pill}</div>`
-      : `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}"><span class="pcard-initial">${esc(initial)}</span>${pill}</div>`;
+    let thumb;
+    if (b.icon) {
+      // Icône extraite/uploadée, sur le fond du splash → aperçu réel.
+      thumb = `<div class="pcard-thumb" style="background:${esc(b.splash || '#14110b')}"><img class="pcard-icon" src="${b.icon}" alt="" />${pill}</div>`;
+    } else if (b.mode !== "bundle" && /^https?:/.test(b.url || "")) {
+      // Mode URL : favicon du site par-dessus l'initiale (fallback si échec).
+      let host = ""; try { host = new URL(b.url).host; } catch {}
+      const fav = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`;
+      thumb = `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}"><span class="pcard-initial">${esc(initial)}</span><img class="pcard-icon pcard-fav" src="${fav}" alt="" onerror="this.remove()" />${pill}</div>`;
+    } else {
+      thumb = `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}"><span class="pcard-initial">${esc(initial)}</span>${pill}</div>`;
+    }
     return `<div class="pcard">
       ${thumb}
       <div class="pcard-main">
@@ -811,7 +825,7 @@
       builds.unshift({
         id: data.id, status: data.status || "pending",
         url: listURL, app_name: appName, mode,
-        icon: iconPreview || null, splash: splashHex(),
+        icon: iconPreview || distIconPreview || null, splash: splashHex(),
       });
       save(); render(); subscribe(data.id);
       form.reset(); clearDist(); clearIcon(); syncSplash(); updatePreview();
@@ -949,9 +963,52 @@
   });
 
   // ---- dist : dossier ou .zip ----
-  let distBlob = null, distName = "";
+  let distBlob = null, distName = "", distIconPreview = null;
   function setDist(blob, name) { distBlob = blob; distName = name; setFileName(name); }
-  function clearDist() { distBlob = null; distName = ""; setFileName(""); }
+  function clearDist() { distBlob = null; distName = ""; distIconPreview = null; setFileName(""); }
+
+  const IMG_MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml", ico: "image/x-icon" };
+  function mimeOfPath(p) { return IMG_MIME[p.split(".").pop().toLowerCase()] || "application/octet-stream"; }
+
+  // Redimensionne une image (blob) en dataURL carré de `size`px (contain).
+  function downscaleToDataURL(blob, size) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const c = document.createElement("canvas"); c.width = c.height = size;
+          const ctx = c.getContext("2d");
+          const r = Math.min(size / img.width, size / img.height);
+          const w = img.width * r, h = img.height * r;
+          ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+          resolve(c.toDataURL("image/png"));
+        } catch (e) { reject(e); } finally { URL.revokeObjectURL(url); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("img")); };
+      img.src = url;
+    });
+  }
+
+  // Choisit la meilleure icône parmi les fichiers du dist et en fait un aperçu.
+  async function extractDistIcon(files) {
+    const imgs = files.filter(f => /\.(png|jpe?g|webp|svg|ico)$/i.test(f.path));
+    if (!imgs.length) return null;
+    const score = (f) => {
+      const p = f.path.toLowerCase(); let s = f.data.length;
+      if (/icon|favicon|logo|apple-touch/.test(p)) s += 5e6;
+      if (/192|180|256|512/.test(p)) s += 2e6;
+      if (p.endsWith(".svg")) s += 1e6;
+      if (p.endsWith(".ico")) s -= 2e6;
+      return s;
+    };
+    imgs.sort((a, b) => score(b) - score(a));
+    for (const f of imgs.slice(0, 4)) {
+      try { return await downscaleToDataURL(new Blob([f.data], { type: mimeOfPath(f.path) }), 128); }
+      catch { /* essaie le suivant */ }
+    }
+    return null;
+  }
 
   // Constructeur de ZIP (méthode "store", sans dépendance externe).
   const CRC_TABLE = (() => {
@@ -1003,14 +1060,15 @@
       files.push({ path: rel, data: new Uint8Array(await e.file.arrayBuffer()) });
     }
     if (!hasIndex) throw new Error("Le dossier doit contenir un index.html.");
-    return { blob: makeZip(files), folder, count: files.length };
+    return { blob: makeZip(files), folder, count: files.length, files };
   }
   async function ingest(list) {
     if (!list.length) return;
     formError.textContent = ""; setFileName("Préparation du zip…");
     try {
-      const { blob, folder, count } = await processDistFiles(list);
+      const { blob, folder, count, files } = await processDistFiles(list);
       setDist(blob, `${folder}/ · ${count} fichiers`);
+      distIconPreview = await extractDistIcon(files); // aperçu depuis l'icône du projet
     } catch (err) { clearDist(); fail(err.message); }
   }
 
