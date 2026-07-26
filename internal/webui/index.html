@@ -346,12 +346,13 @@
     width: 58px; height: 58px; border-radius: 15px; object-fit: contain;
     box-shadow: 0 8px 20px -8px rgba(0,0,0,0.65);
   }
-  .pcard-fav {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-    width: 64px; height: 64px; padding: 11px; border-radius: 16px;
-    background: rgba(14,11,6,0.85);
+  .pcard-shot {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; object-position: top center;
+    animation: fade .4s ease;
   }
-  .pcard-pill { position: absolute; top: 10px; left: 10px; }
+  @keyframes fade { from { opacity: 0; } }
+  .pcard-pill { position: absolute; top: 10px; left: 10px; z-index: 1; }
   .pcard-main { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
   .pcard-info { flex: 1; min-width: 0; }
   .pcard-title {
@@ -694,18 +695,12 @@
     const sub = failed && b.error ? esc(b.error)
       : (b.mode === "bundle" ? `▣ ${esc(b.url)} · hors-ligne` : esc(b.url));
     const pill = `<span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>`;
-    let thumb;
-    if (b.icon) {
-      // Icône extraite/uploadée, sur le fond du splash → aperçu réel.
-      thumb = `<div class="pcard-thumb" style="background:${esc(b.splash || '#14110b')}"><img class="pcard-icon" src="${b.icon}" alt="" />${pill}</div>`;
-    } else if (b.mode !== "bundle" && /^https?:/.test(b.url || "")) {
-      // Mode URL : favicon du site par-dessus l'initiale (fallback si échec).
-      let host = ""; try { host = new URL(b.url).host; } catch {}
-      const fav = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`;
-      thumb = `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}"><span class="pcard-initial">${esc(initial)}</span><img class="pcard-icon pcard-fav" src="${fav}" alt="" onerror="this.remove()" />${pill}</div>`;
-    } else {
-      thumb = `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}"><span class="pcard-initial">${esc(initial)}</span>${pill}</div>`;
-    }
+    // Mode URL : vraie capture de la page (screenshot) par-dessus le dégradé+initiale (fallback).
+    const isURL = b.mode !== "bundle" && /^https?:/.test(b.url || "");
+    const shot = isURL
+      ? `<img class="pcard-shot" src="https://s.wordpress.com/mshots/v1/${encodeURIComponent(b.url)}?w=600&h=400" alt="" loading="lazy" onerror="this.remove()" />`
+      : "";
+    const thumb = `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}"><span class="pcard-initial">${esc(initial)}</span>${shot}${pill}</div>`;
     return `<div class="pcard">
       ${thumb}
       <div class="pcard-main">
