@@ -43,6 +43,7 @@ type Config struct {
 	Workflow string // nom de fichier du workflow, ex: build-apk.yml
 	Ref      string // branche sur laquelle lancer le workflow, ex: main
 	Releases string // dossier où sont écrits les APK produits
+	Thumbs   string // dossier où sont écrites les miniatures (screenshots)
 }
 
 // Load lit la configuration depuis les variables d'environnement et valide
@@ -59,6 +60,7 @@ func Load() (*Config, error) {
 		Workflow: env("GITHUB_WORKFLOW", "build-apk.yml"),
 		Ref:      env("GITHUB_REF", "main"),
 		Releases: env("RELEASES_DIR", "releases"),
+		Thumbs:   env("THUMBS_DIR", "thumbs"),
 	}
 
 	var missing []string

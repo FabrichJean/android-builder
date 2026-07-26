@@ -21,19 +21,30 @@ import (
 	"github.com/example/android-builder/internal/buildstore"
 	"github.com/example/android-builder/internal/config"
 	"github.com/example/android-builder/internal/ghclient"
+	"github.com/example/android-builder/internal/thumb"
 	"github.com/example/android-builder/internal/webui"
 )
 
 // Server relie l'API HTTP, le store et le client GitHub.
 type Server struct {
-	cfg   *config.Config
-	gh    *ghclient.Client
-	store *buildstore.Store
-	log   *slog.Logger
+	cfg    *config.Config
+	gh     *ghclient.Client
+	store  *buildstore.Store
+	log    *slog.Logger
+	chrome string        // binaire Chrome pour les miniatures ("" si absent)
+	sem    chan struct{} // limite les captures Chrome concurrentes
 }
 
 func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, gh: gh, store: store, log: log}
+	chrome := thumb.ChromePath()
+	if chrome == "" {
+		log.Warn("Chrome introuvable — miniatures désactivées (installe Chrome ou définis CHROME_PATH)")
+	}
+	return &Server{
+		cfg: cfg, gh: gh, store: store, log: log,
+		chrome: chrome,
+		sem:    make(chan struct{}, 2),
+	}
 }
 
 // Routes construit le routeur HTTP.
@@ -44,6 +55,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/builds/{id}", s.handleGetBuild)
 	mux.HandleFunc("GET /api/builds/{id}/events", s.handleEvents)
 	mux.HandleFunc("GET /api/builds/{id}/apk", s.handleDownloadAPK)
+	mux.HandleFunc("GET /api/builds/{id}/thumb", s.handleThumb)
 	// Interface web statique (index.html embarqué) sur toutes les autres routes.
 	mux.Handle("GET /", http.FileServerFS(webui.FS()))
 	return mux
@@ -66,6 +78,7 @@ var (
 	urlRe   = regexp.MustCompile(`^https?://`)
 	vnameRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 	vcodeRe = regexp.MustCompile(`^[0-9]+$`)
+	idRe    = regexp.MustCompile(`^[a-f0-9]{4,}$`)
 )
 
 const (
@@ -200,6 +213,7 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 
 	// Suivi asynchrone : détaché du contexte de la requête HTTP.
 	go s.watch(id, "apk-"+id, dispatchedAt, nil)
+	go s.captureThumb(id, "url", req.URL, nil)
 
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"id":     id,
@@ -379,6 +393,11 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go s.watch(id, "apk-"+id, dispatchedAt, cleanup)
+	if bundle {
+		go s.captureThumb(id, "bundle", "", distData)
+	} else {
+		go s.captureThumb(id, "url", appURL, nil)
+	}
 
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"id":     id,
@@ -530,6 +549,48 @@ func (s *Server) handleGetBuild(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, b)
+}
+
+// captureThumb génère (en arrière-plan) la miniature d'un build via Chrome local.
+func (s *Server) captureThumb(id, mode, url string, dist []byte) {
+	if s.chrome == "" {
+		return
+	}
+	s.sem <- struct{}{}
+	defer func() { <-s.sem }()
+
+	out := filepath.Join(s.cfg.Thumbs, id+".png")
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	var err error
+	if mode == "bundle" {
+		err = thumb.CaptureDist(ctx, s.chrome, dist, out)
+	} else {
+		err = thumb.CaptureURL(ctx, s.chrome, url, out)
+	}
+	if err != nil {
+		s.log.Warn("miniature", "build_id", id, "err", err)
+	} else {
+		s.log.Info("miniature générée", "build_id", id)
+	}
+}
+
+// handleThumb sert la miniature PNG d'un build.
+func (s *Server) handleThumb(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !idRe.MatchString(id) {
+		writeErr(w, http.StatusBadRequest, "id invalide")
+		return
+	}
+	path := filepath.Join(s.cfg.Thumbs, id+".png")
+	if _, err := os.Stat(path); err != nil {
+		writeErr(w, http.StatusNotFound, "miniature indisponible")
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, path)
 }
 
 // handleEvents diffuse en SSE l'état d'un build (progression, étapes, statut)

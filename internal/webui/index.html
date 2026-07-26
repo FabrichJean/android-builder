@@ -694,11 +694,14 @@
     const sub = failed && b.error ? esc(b.error)
       : (b.mode === "bundle" ? `▣ ${esc(b.url)} · hors-ligne` : esc(b.url));
     const pill = `<span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>`;
-    // Mode URL : vraie capture de la page (screenshot) par-dessus le dégradé+initiale (fallback).
+    // Miniature = screenshot local du serveur (URL publique/LAN ou dist).
+    // Repli : mShots pour les URL publiques, sinon dégradé + initiale.
     const isURL = b.mode !== "bundle" && /^https?:/.test(b.url || "");
-    const shot = isURL
-      ? `<img class="pcard-shot" src="https://s.wordpress.com/mshots/v1/${encodeURIComponent(b.url)}?w=600&h=400" alt="" loading="lazy" onerror="this.remove()" />`
-      : "";
+    const mshots = isURL ? `https://s.wordpress.com/mshots/v1/${encodeURIComponent(b.url)}?w=600&h=400` : "";
+    const onerr = isURL
+      ? `this.onerror=function(){this.remove()};this.src='${mshots}'`
+      : `this.remove()`;
+    const shot = `<img class="pcard-shot" src="/api/builds/${b.id}/thumb" alt="" loading="lazy" onerror="${onerr}" />`;
     const thumb = `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}"><span class="pcard-initial">${esc(initial)}</span>${shot}${pill}</div>`;
     return `<div class="pcard">
       ${thumb}
@@ -725,13 +728,9 @@
     buildsEl.innerHTML = list.map(card).join("");
   }
 
-  // mShots renvoie d'abord un placeholder « en génération » : on recharge
-  // les captures après un délai pour récupérer le vrai screenshot.
-  function refreshShots() {
-    buildsEl.querySelectorAll(".pcard-shot").forEach(img => {
-      const s = img.getAttribute("src"); img.src = ""; img.src = s;
-    });
-  }
+  // La miniature locale est générée en ~5-15 s : on re-render pour la récupérer
+  // dès qu'elle est prête (recrée les <img> avec src=/thumb frais).
+  function refreshShots() { render(); }
 
   buildsEl.addEventListener("click", (e) => {
     const id = e.target.getAttribute?.("data-remove");
@@ -830,7 +829,7 @@
         icon: iconPreview || distIconPreview || null, splash: splashHex(),
       });
       save(); render(); subscribe(data.id);
-      [6000, 14000].forEach(t => setTimeout(refreshShots, t));
+      [5000, 11000, 20000].forEach(t => setTimeout(refreshShots, t));
       form.reset(); clearDist(); clearIcon(); syncSplash(); updatePreview();
     } catch (err) {
       fail(err.message);
@@ -1139,7 +1138,7 @@
   // Reprise du suivi temps réel au chargement pour les builds non terminés.
   render();
   builds.filter(b => !isTerminal(b.status)).forEach(b => subscribe(b.id));
-  [6000, 14000].forEach(t => setTimeout(refreshShots, t)); // récupère les screenshots générés
+  [5000, 11000, 20000].forEach(t => setTimeout(refreshShots, t)); // récupère les screenshots générés
 })();
 </script>
 </body>

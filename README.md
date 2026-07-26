@@ -125,6 +125,19 @@ curl -X POST http://localhost:8080/api/builds \
 
 L'interface web propose un **aperçu façon téléphone** en direct (fond + icône + nom).
 
+### Miniatures (screenshots)
+
+Le serveur génère une **vraie miniature** de chaque build via un **Chrome headless
+local** (`GET /api/builds/{id}/thumb`), affichée sur les cartes de l'interface :
+
+- **Mode URL** : screenshot de la page — fonctionne aussi pour les URL **locales/LAN**
+  (le serveur est sur le même réseau), contrairement à un service externe.
+- **Mode bundle** : le dist est servi sur un serveur statique local puis capturé.
+
+Chrome est détecté automatiquement (macOS/Linux) ; sinon, définir `CHROME_PATH`.
+Si Chrome est absent, les miniatures sont simplement désactivées (repli sur un
+dégradé, ou sur un screenshot public via mShots pour les URL publiques).
+
 ### Téléchargements
 
 Les téléchargements déclenchés dans la page (liens de fichiers, `blob:`, `data:`)

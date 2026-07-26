@@ -17,3 +17,6 @@ local.properties
 
 # zips de dist des exemples (générés)
 examples/*.zip
+
+# miniatures (screenshots) générées
+/thumbs/
