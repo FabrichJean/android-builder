@@ -366,6 +366,37 @@
   }
   .pcard .progress-wrap { padding: 0 14px 14px; margin-top: 0; }
 
+  /* ---- dock flottant des builds en cours ---- */
+  .active-dock {
+    position: fixed; bottom: 20px; right: 20px; z-index: 30;
+    width: 300px; max-width: calc(100vw - 40px);
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border-2); border-radius: 14px;
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,0.85);
+    overflow: hidden; animation: rise .3s ease;
+  }
+  .active-dock[hidden] { display: none; }
+  .active-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 11px 14px; font-size: 13px; font-weight: 650; color: var(--sand);
+    border-bottom: 1px solid var(--border); background: rgba(224,192,125,0.06);
+  }
+  .active-head .spin {
+    width: 12px; height: 12px; border-radius: 50%; flex: none;
+    border: 2px solid var(--sand); border-top-color: transparent;
+    animation: spin .7s linear infinite; margin-right: 8px;
+  }
+  .active-head-title { flex: 1; display: flex; align-items: center; }
+  .active-head button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; font-family: inherit; padding: 2px 6px; }
+  .active-head button:hover { color: var(--sand); }
+  .active-list { max-height: 300px; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+  .active-dock.collapsed .active-list { display: none; }
+  .active-item { padding: 9px 10px; border-radius: 9px; }
+  .active-item-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 7px; }
+  .active-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .active-pct { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .active-step { font-size: 11.5px; color: var(--sand-dim); margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
   .pill {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
@@ -584,6 +615,15 @@
     </div>
   </div>
 
+  <!-- dock flottant : builds en cours -->
+  <div class="active-dock" id="activeDock" hidden>
+    <div class="active-head">
+      <span class="active-head-title"><span class="spin"></span><span id="activeTitle">Builds en cours</span></span>
+      <button type="button" id="activeToggle" title="Réduire">▁</button>
+    </div>
+    <div class="active-list" id="activeList"></div>
+  </div>
+
   <!-- modal de recadrage d'icône -->
   <div class="modal" id="cropModal">
     <div class="modal-card">
@@ -701,9 +741,9 @@
     }
     return `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}">${inner}</div>`;
   }
-  // Corps dynamique : titre, sous-titre, actions, progression.
+  // Corps dynamique de la carte : titre, sous-titre, actions.
+  // (La progression détaillée est affichée dans le dock flottant.)
   function bodyHTML(b) {
-    const active = b.status === "pending" || b.status === "building";
     const failed = b.status === "failed";
     const download = b.status === "success"
       ? `<a class="icon-btn primary" href="/api/builds/${b.id}/apk" title="Télécharger l'APK" download>↓</a>` : "";
@@ -719,8 +759,7 @@
           <p class="pcard-sub"${failed ? ' style="color:var(--err)"' : ''} title="${esc(sub)}">${sub}</p>
         </div>
         <div class="actions">${download}${runLink}${remove}</div>
-      </div>
-      ${active ? renderProgress(b) : ""}`;
+      </div>`;
   }
   function card(b) {
     return `<div class="pcard" data-card="${b.id}">${thumbHTML(b)}${pillHTML(b)}<div class="pcard-body">${bodyHTML(b)}</div></div>`;
@@ -733,11 +772,57 @@
   }
   function patch(b) {
     const el = buildsEl.querySelector(`.pcard[data-card="${b.id}"]`);
-    if (!el) { if (isVisible(b)) render(); return; }
-    if (!isVisible(b)) { el.remove(); if (!buildsEl.querySelector(".pcard")) render(); return; }
-    const p = el.querySelector(".pcard-pill"); if (p) p.outerHTML = pillHTML(b);
-    const body = el.querySelector(".pcard-body"); if (body) body.innerHTML = bodyHTML(b);
+    if (el && !isVisible(b)) { el.remove(); if (!buildsEl.querySelector(".pcard")) render(); }
+    else if (!el) { if (isVisible(b)) render(); }
+    else {
+      const p = el.querySelector(".pcard-pill"); if (p) p.outerHTML = pillHTML(b);
+      const body = el.querySelector(".pcard-body"); if (body) body.innerHTML = bodyHTML(b);
+    }
+    patchActive(b); // met à jour le dock des builds en cours
   }
+
+  // ---- dock flottant des builds en cours ----
+  const activeBuilds = () => builds.filter(b => b.status === "pending" || b.status === "building");
+  function stepLabel(b) {
+    return b.current_step || (b.status === "pending" ? "Démarrage du workflow…" : "En cours…");
+  }
+  function activeRow(b) {
+    const pct = Math.max(0, Math.min(100, b.progress || 0));
+    return `<div class="active-item" data-active="${b.id}">
+      <div class="active-item-head">
+        <span class="active-name">${esc(b.app_name)}</span>
+        <span class="active-pct">${pct}%</span>
+      </div>
+      <div class="track"><span style="width:${pct}%"></span></div>
+      <div class="active-step">${esc(stepLabel(b))}</div>
+    </div>`;
+  }
+  function renderActive() {
+    const list = activeBuilds();
+    const dock = $("activeDock");
+    if (!list.length) { dock.hidden = true; return; }
+    dock.hidden = false;
+    $("activeTitle").textContent = `Builds en cours (${list.length})`;
+    $("activeList").innerHTML = list.map(activeRow).join("");
+  }
+  // Mise à jour en place d'une ligne du dock (barre lisse, sans clignotement).
+  function patchActive(b) {
+    const item = $("activeList").querySelector(`[data-active="${b.id}"]`);
+    const active = b.status === "pending" || b.status === "building";
+    if (active !== !!item) { renderActive(); return; } // entrée/sortie -> reconstruit
+    if (!active) return;
+    const pct = Math.max(0, Math.min(100, b.progress || 0));
+    item.querySelector(".active-pct").textContent = pct + "%";
+    item.querySelector(".track > span").style.width = pct + "%";
+    item.querySelector(".active-step").textContent = stepLabel(b);
+    $("activeTitle").textContent = `Builds en cours (${activeBuilds().length})`;
+  }
+  $("activeToggle").addEventListener("click", () => {
+    const d = $("activeDock");
+    const collapsed = d.classList.toggle("collapsed");
+    $("activeToggle").textContent = collapsed ? "▢" : "▁";
+    $("activeToggle").title = collapsed ? "Agrandir" : "Réduire";
+  });
   function render() {
     const q = (searchEl && searchEl.value || "").trim().toLowerCase();
     const list = builds.filter(b => matchFilter(b) &&
@@ -746,9 +831,11 @@
       buildsEl.innerHTML = `<div class="builds-empty">${builds.length
         ? "Aucun build ne correspond."
         : "Aucun build pour l'instant — crée ta première app ci-dessus."}</div>`;
+      renderActive();
       return;
     }
     buildsEl.innerHTML = list.map(card).join("");
+    renderActive();
   }
 
   // Sonde les miniatures locales (générées en ~5-15 s) et marque chaque build
