@@ -694,15 +694,19 @@
     const sub = failed && b.error ? esc(b.error)
       : (b.mode === "bundle" ? `▣ ${esc(b.url)} · hors-ligne` : esc(b.url));
     const pill = `<span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>`;
-    // Miniature = screenshot local du serveur (URL publique/LAN ou dist).
-    // Repli : mShots pour les URL publiques, sinon dégradé + initiale.
     const isURL = b.mode !== "bundle" && /^https?:/.test(b.url || "");
     const mshots = isURL ? `https://s.wordpress.com/mshots/v1/${encodeURIComponent(b.url)}?w=600&h=400` : "";
-    const onerr = isURL
-      ? `this.onerror=function(){this.remove()};this.src='${mshots}'`
-      : `this.remove()`;
-    const shot = `<img class="pcard-shot" src="/api/builds/${b.id}/thumb" alt="" loading="lazy" onerror="${onerr}" />`;
-    const thumb = `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}"><span class="pcard-initial">${esc(initial)}</span>${shot}${pill}</div>`;
+    let inner;
+    if (b.thumbReady) {
+      // Miniature locale déjà générée : servie depuis le cache navigateur (immuable).
+      inner = `<img class="pcard-shot" src="/api/builds/${b.id}/thumb" alt="" onerror="this.remove()" />${pill}`;
+    } else if (isURL) {
+      // En attendant la capture locale : screenshot public (URL publiques uniquement).
+      inner = `<span class="pcard-initial">${esc(initial)}</span><img class="pcard-shot" src="${mshots}" alt="" loading="lazy" onerror="this.remove()" />${pill}`;
+    } else {
+      inner = `<span class="pcard-initial">${esc(initial)}</span>${pill}`;
+    }
+    const thumb = `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}">${inner}</div>`;
     return `<div class="pcard">
       ${thumb}
       <div class="pcard-main">
@@ -728,9 +732,26 @@
     buildsEl.innerHTML = list.map(card).join("");
   }
 
-  // La miniature locale est générée en ~5-15 s : on re-render pour la récupérer
-  // dès qu'elle est prête (recrée les <img> avec src=/thumb frais).
-  function refreshShots() { render(); }
+  // Sonde les miniatures locales (générées en ~5-15 s) et marque chaque build
+  // `thumbReady` dès qu'elle existe. Une fois prête, elle n'est plus rechargée
+  // (cache immuable + on ne re-render que quand une nouvelle devient dispo).
+  const expectsThumb = (b) => b.mode === "bundle" || /^https?:/.test(b.url || "");
+  function pollThumbs(attempt) {
+    const pending = builds.filter(b => !b.thumbReady && expectsThumb(b));
+    if (!pending.length || attempt > 15) return;
+    let remaining = pending.length, changed = false;
+    const done = () => {
+      if (--remaining > 0) return;
+      if (changed) { save(); render(); }
+      setTimeout(() => pollThumbs(attempt + 1), 3000);
+    };
+    pending.forEach(b => {
+      const im = new Image();
+      im.onload = () => { b.thumbReady = true; changed = true; done(); };
+      im.onerror = done;
+      im.src = `/api/builds/${b.id}/thumb`; // 404 tant que pas prête (non mis en cache)
+    });
+  }
 
   buildsEl.addEventListener("click", (e) => {
     const id = e.target.getAttribute?.("data-remove");
@@ -829,7 +850,7 @@
         icon: iconPreview || distIconPreview || null, splash: splashHex(),
       });
       save(); render(); subscribe(data.id);
-      [5000, 11000, 20000].forEach(t => setTimeout(refreshShots, t));
+      pollThumbs(0);
       form.reset(); clearDist(); clearIcon(); syncSplash(); updatePreview();
     } catch (err) {
       fail(err.message);
@@ -1138,7 +1159,7 @@
   // Reprise du suivi temps réel au chargement pour les builds non terminés.
   render();
   builds.filter(b => !isTerminal(b.status)).forEach(b => subscribe(b.id));
-  [5000, 11000, 20000].forEach(t => setTimeout(refreshShots, t)); // récupère les screenshots générés
+  pollThumbs(0);
 })();
 </script>
 </body>
