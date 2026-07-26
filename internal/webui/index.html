@@ -127,6 +127,38 @@
   .pop-field:last-child { margin-bottom: 0; }
   .popover .phone { margin-top: 14px; }
 
+  /* source : URL ou import de projet */
+  .pb-or { display: flex; align-items: center; gap: 12px; color: var(--faint); font-size: 12px; margin: 12px 2px; }
+  .pb-or::before, .pb-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .pb-import-row { display: flex; align-items: center; gap: 12px; }
+  .pb-import {
+    flex: 1; display: inline-flex; align-items: center; gap: 12px;
+    background: var(--sand-soft); border: 1px dashed var(--sand-dim); color: var(--sand);
+    font-family: inherit; font-size: 14.5px; font-weight: 650; text-align: left;
+    padding: 14px 16px; border-radius: 12px; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .pb-import:hover, .pb-fields.drag .pb-import { background: rgba(224,192,125,0.18); border-color: var(--sand); }
+  .pb-import-ic { font-size: 20px; flex: none; }
+  .pb-import small { display: block; font-size: 11.5px; font-weight: 450; color: var(--sand-dim); margin-top: 2px; }
+  .pb-zip {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 10px 12px;
+    border-radius: 10px; cursor: pointer; flex: none;
+  }
+  .pb-zip:hover { color: var(--sand); border-color: var(--border-2); }
+  .pb-project {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--sand-soft); border: 1px solid var(--sand-dim);
+    border-radius: 12px; padding: 12px 14px;
+  }
+  .pb-project-ic { font-size: 18px; flex: none; }
+  .pb-project-name { flex: 1; font-size: 14px; font-weight: 600; color: var(--sand);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pb-project-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px; }
+  .pb-project-clear:hover { color: var(--err); }
+  .pb-fields.drag { outline: 2px dashed var(--sand); outline-offset: 8px; border-radius: 8px; }
+
   /* ---- galerie ---- */
   .gallery {
     max-width: 1140px; margin: -42px auto 0; padding: 0 20px 80px;
@@ -547,29 +579,31 @@
 
       <div class="card">
         <form id="form" novalidate class="promptbar">
-          <div class="pb-fields">
-            <div class="pb-input" id="urlField">
+          <div class="pb-fields" id="dropZone">
+            <div class="pb-input" id="urlRow">
               <span class="pb-ic">🌐</span>
-              <input id="url" type="url" placeholder="Colle une URL — https://exemple.com" />
+              <input id="url" type="url" placeholder="Colle l'URL d'un site — https://exemple.com" />
             </div>
-            <div class="pb-input pb-drop" id="distField" style="display:none">
-              <div class="drop" id="drop">
-                <strong>Glisse un dossier ou un .zip</strong>
-                <span class="file-name" id="fileName"></span>
-                <div class="drop-btns">
-                  <button type="button" id="pickDir">📁 Dossier</button>
-                  <button type="button" id="pickZip">🗜 .zip</button>
-                </div>
-              </div>
-              <input id="distDir" type="file" webkitdirectory hidden />
-              <input id="dist" type="file" accept=".zip,application/zip" hidden />
+            <div class="pb-or" id="pbOr"><span>ou</span></div>
+            <div class="pb-import-row" id="importRow">
+              <button type="button" class="pb-import" id="pickDir">
+                <span class="pb-import-ic">📁</span>
+                <span>Importer ton projet web<small>dossier ou .zip — glisse-le ici</small></span>
+              </button>
+              <button type="button" class="pb-zip" id="pickZip">.zip</button>
+            </div>
+            <div class="pb-project" id="projectRow" hidden>
+              <span class="pb-project-ic">📦</span>
+              <span class="pb-project-name" id="projectName"></span>
+              <button type="button" class="pb-project-clear" id="projectClear" title="Changer de source">✕</button>
             </div>
             <input id="name" type="text" class="pb-name" placeholder="Nom de l'application" required maxlength="60" />
+            <input id="distDir" type="file" webkitdirectory hidden />
+            <input id="dist" type="file" accept=".zip,application/zip" hidden />
           </div>
 
           <div class="pb-bar">
             <div class="pb-chips">
-              <button type="button" class="chip" id="modeChip" title="Basculer URL / projet web">🌐 URL</button>
               <button type="button" class="chip" id="iconChip" title="Icône de l'app"><span class="chip-thumb" id="iconImg"></span>Icône</button>
               <button type="button" class="chip" id="splashChip" title="Écran de démarrage"><span class="swatch" id="splashSwatch"></span>Splash</button>
               <button type="button" class="chip" id="optionsChip" title="Options avancées">⚙ Options</button>
@@ -1133,24 +1167,31 @@
 
   syncSplash(); updatePreview();
 
-  // ---- bascule de mode (URL / projet web), via la puce ----
+  // ---- source : URL (défaut) ou projet importé (bundle), mode implicite ----
   let mode = "url";
-  function setFileName(name) {
-    $("fileName").textContent = name || "";
-  }
-  function setMode(m) {
-    mode = m;
-    $("modeChip").innerHTML = m === "url" ? "🌐 URL" : "📁 Projet web";
-    $("urlField").style.display = m === "url" ? "" : "none";
-    $("distField").style.display = m === "bundle" ? "" : "none";
+  function enterURLMode() {
+    mode = "url";
+    $("urlRow").style.display = "";
+    $("pbOr").style.display = "";
+    $("importRow").style.display = "";
+    $("projectRow").hidden = true;
     formError.textContent = "";
   }
-  $("modeChip").addEventListener("click", () => setMode(mode === "url" ? "bundle" : "url"));
+  function enterBundleMode(label) {
+    mode = "bundle";
+    $("urlRow").style.display = "none";
+    $("pbOr").style.display = "none";
+    $("importRow").style.display = "none";
+    $("projectRow").hidden = false;
+    $("projectName").textContent = label;
+    formError.textContent = "";
+  }
+  $("projectClear").addEventListener("click", () => clearDist());
 
   // ---- dist : dossier ou .zip ----
   let distBlob = null, distName = "", distIconPreview = null;
-  function setDist(blob, name) { distBlob = blob; distName = name; setFileName(name); }
-  function clearDist() { distBlob = null; distName = ""; distIconPreview = null; setFileName(""); }
+  function setDist(blob, name) { distBlob = blob; distName = name; enterBundleMode(name); }
+  function clearDist() { distBlob = null; distName = ""; distIconPreview = null; enterURLMode(); }
 
   const IMG_MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml", ico: "image/x-icon" };
   function mimeOfPath(p) { return IMG_MIME[p.split(".").pop().toLowerCase()] || "application/octet-stream"; }
@@ -1249,7 +1290,7 @@
   }
   async function ingest(list) {
     if (!list.length) return;
-    formError.textContent = ""; setFileName("Préparation du zip…");
+    formError.textContent = ""; enterBundleMode("Préparation…");
     try {
       const { blob, folder, count, files } = await processDistFiles(list);
       setDist(blob, `${folder}/ · ${count} fichiers`);
@@ -1275,7 +1316,7 @@
     }
   }
 
-  const drop = $("drop");
+  const dropZone = $("dropZone");
   $("pickZip").addEventListener("click", () => $("dist").click());
   $("pickDir").addEventListener("click", () => $("distDir").click());
   $("dist").addEventListener("change", () => { const f = $("dist").files[0]; if (f) setDist(f, f.name); });
@@ -1283,11 +1324,11 @@
     ingest([...$("distDir").files].map((f) => ({ path: f.webkitRelativePath || f.name, file: f }))));
 
   ["dragover", "dragenter"].forEach((ev) =>
-    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+    dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add("drag"); }));
   ["dragleave"].forEach((ev) =>
-    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
-  drop.addEventListener("drop", async (e) => {
-    e.preventDefault(); drop.classList.remove("over");
+    dropZone.addEventListener(ev, (e) => { e.preventDefault(); if (e.target === dropZone) dropZone.classList.remove("drag"); }));
+  dropZone.addEventListener("drop", async (e) => {
+    e.preventDefault(); dropZone.classList.remove("drag");
     const items = e.dataTransfer.items;
     if (items && items.length && items[0].webkitGetAsEntry) {
       const roots = [];
