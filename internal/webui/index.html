@@ -6,10 +6,10 @@
 <title>APK Builder</title>
 <style>
   :root {
-    --bg:        #14110b;
-    --bg-glow:   #1d180f;
-    --surface:   #1c180f;
-    --surface-2: #221d13;
+    --bg:        #080703;
+    --bg-glow:   #16120b;
+    --surface:   #1a160e;
+    --surface-2: #201b12;
     --border:    rgba(224, 201, 141, 0.12);
     --border-2:  rgba(224, 201, 141, 0.22);
     --text:      #ece3d0;
@@ -342,6 +342,10 @@
     font-size: 42px; font-weight: 800; color: rgba(255,255,255,0.92);
     text-shadow: 0 2px 14px rgba(0,0,0,0.4);
   }
+  .pcard-icon {
+    width: 58px; height: 58px; border-radius: 15px;
+    box-shadow: 0 8px 20px -8px rgba(0,0,0,0.65);
+  }
   .pcard-pill { position: absolute; top: 10px; left: 10px; }
   .pcard-main { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
   .pcard-info { flex: 1; min-width: 0; }
@@ -615,7 +619,15 @@
     try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
     catch { return []; }
   }
-  function save() { localStorage.setItem(STORE_KEY, JSON.stringify(builds)); }
+  function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(builds));
+    } catch {
+      // Quota dépassé : on retire les aperçus d'icônes les plus anciens et on réessaie.
+      builds.slice(8).forEach(b => { b.icon = null; });
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(builds)); } catch {}
+    }
+  }
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
@@ -676,11 +688,12 @@
     const failed = b.status === "failed";
     const sub = failed && b.error ? esc(b.error)
       : (b.mode === "bundle" ? `▣ ${esc(b.url)} · hors-ligne` : esc(b.url));
+    const pill = `<span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>`;
+    const thumb = b.icon
+      ? `<div class="pcard-thumb" style="background:${esc(b.splash || '#14110b')}"><img class="pcard-icon" src="${b.icon}" alt="" />${pill}</div>`
+      : `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}"><span class="pcard-initial">${esc(initial)}</span>${pill}</div>`;
     return `<div class="pcard">
-      <div class="pcard-thumb" style="${thumbStyle(b.app_name)}">
-        <span class="pcard-initial">${esc(initial)}</span>
-        <span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>
-      </div>
+      ${thumb}
       <div class="pcard-main">
         <div class="pcard-info">
           <p class="pcard-title">${esc(b.app_name)}</p>
@@ -798,6 +811,7 @@
       builds.unshift({
         id: data.id, status: data.status || "pending",
         url: listURL, app_name: appName, mode,
+        icon: iconPreview || null, splash: splashHex(),
       });
       save(); render(); subscribe(data.id);
       form.reset(); clearDist(); clearIcon(); syncSplash(); updatePreview();
@@ -811,7 +825,7 @@
   function fail(msg) { formError.textContent = msg; }
 
   // ---- icône + splash + aperçu ----
-  let iconBlob = null, iconURL = null;
+  let iconBlob = null, iconURL = null, iconPreview = null;
   const splashColor = $("splashColor"), splashHexInput = $("splashHex");
 
   function splashHex() {
@@ -819,7 +833,7 @@
     return /^#[0-9a-fA-F]{6}$/.test(v) ? v : splashColor.value;
   }
   function clearIcon() {
-    iconBlob = null;
+    iconBlob = null; iconPreview = null;
     if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; }
     $("iconImg").style.backgroundImage = "";
     $("phoneIcon").style.backgroundImage = "";
@@ -909,6 +923,10 @@
     const octx = out.getContext("2d");
     const k = 512 / VIEW;
     octx.drawImage(cImg, cx * k, cy * k, cImg.width * cScale * k, cImg.height * cScale * k);
+    // Petit aperçu (128px) persisté en localStorage pour les cartes.
+    const prev = document.createElement("canvas"); prev.width = prev.height = 128;
+    prev.getContext("2d").drawImage(out, 0, 0, 128, 128);
+    iconPreview = prev.toDataURL("image/png");
     out.toBlob((blob) => { if (blob) setIcon(blob); }, "image/png");
     cropModal.classList.remove("open");
   });
