@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Device Lab</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="top">
+    <h1><svg class="ic" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg> Device Lab</h1>
+    <p>Démo des accès natifs exposés par le template APK Builder.</p>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button type="button" class="tab active" data-tab="audio">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      Musique
+    </button>
+    <button type="button" class="tab" data-tab="video">
+      <svg class="ic" viewBox="0 0 24 24"><rect x="2" y="5" width="15" height="14" rx="2"/><path d="M17 10l5-3v10l-5-3"/></svg>
+      Vidéos
+    </button>
+    <button type="button" class="tab" data-tab="image">
+      <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-6-6-9 9"/></svg>
+      Photos
+    </button>
+    <button type="button" class="tab" data-tab="other">
+      <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      Autres
+    </button>
+  </nav>
+
+  <main>
+    <section class="panel active" id="panel-audio" data-media="audio">
+      <div class="gate"></div>
+      <div class="list"></div>
+    </section>
+
+    <section class="panel" id="panel-video" data-media="video">
+      <div class="gate"></div>
+      <div class="grid"></div>
+    </section>
+
+    <section class="panel" id="panel-image" data-media="image">
+      <div class="gate"></div>
+      <div class="grid photos"></div>
+    </section>
+
+    <section class="panel" id="panel-other">
+      <div class="card-list">
+        <div class="card">
+          <div class="card-info">
+            <strong>Vibration</strong>
+            <span>AndroidDevice.vibrate(ms)</span>
+          </div>
+          <button type="button" id="btnVibrate">Vibrer 300ms</button>
+        </div>
+        <div class="card">
+          <div class="card-info">
+            <strong>Partage natif</strong>
+            <span>AndroidDevice.share(texte)</span>
+          </div>
+          <button type="button" id="btnShare">Partager</button>
+        </div>
+        <div class="card">
+          <div class="card-info">
+            <strong>Batterie</strong>
+            <span>AndroidDevice.batteryLevel()</span>
+          </div>
+          <button type="button" id="btnBattery">Lire le niveau</button>
+        </div>
+      </div>
+      <p class="result" id="otherResult"></p>
+    </section>
+  </main>
+
+  <div class="lightbox" id="lightbox">
+    <button type="button" class="lightbox-close" id="lightboxClose">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <img id="lightboxImg" alt="" />
+    <video id="lightboxVideo" controls></video>
+  </div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
