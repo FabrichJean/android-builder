@@ -82,8 +82,8 @@ class BackgroundPlaybackService : Service() {
 /** Pont JS : la page signale ici le début/la fin de la lecture audio/vidéo. */
 internal class PlaybackBridge(private val activity: MainActivity) {
     @JavascriptInterface
-    fun notifyPlaying() = activity.runOnUiThread { activity.onBackgroundPlaybackStateChanged(true) }
+    fun notifyPlaying() = activity.runOnUiThread { activity.onMediaPlaybackStateChanged(true) }
 
     @JavascriptInterface
-    fun notifyStopped() = activity.runOnUiThread { activity.onBackgroundPlaybackStateChanged(false) }
+    fun notifyStopped() = activity.runOnUiThread { activity.onMediaPlaybackStateChanged(false) }
 }
