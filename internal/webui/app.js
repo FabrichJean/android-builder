@@ -322,6 +322,7 @@
       save(); render(); subscribe(data.id);
       pollThumbs(0);
       form.reset(); clearDist(); clearIcon(); syncSplash(); updatePreview();
+      switchView("history"); // le build vient d'être créé : direction l'historique pour le suivre
     } catch (err) {
       fail(err.message);
     } finally {
@@ -711,6 +712,19 @@
   $("accountLogout").addEventListener("click", async () => {
     await fetch("/auth/logout", { method: "POST" });
     location.reload();
+  });
+
+  // ---- sidebar : navigation Accueil/Historique + réduction ----
+  const sbViews = { home: $("view-home"), history: $("view-history") };
+  function switchView(name) {
+    document.querySelectorAll(".sb-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+    Object.entries(sbViews).forEach(([k, el]) => { el.hidden = k !== name; });
+  }
+  document.querySelectorAll(".sb-item").forEach((btn) => {
+    btn.addEventListener("click", () => switchView(btn.dataset.view));
+  });
+  $("sbCollapse").addEventListener("click", () => {
+    $("sidebar").classList.toggle("collapsed");
   });
 
   // Reprise du suivi temps réel au chargement pour les builds non terminés.
