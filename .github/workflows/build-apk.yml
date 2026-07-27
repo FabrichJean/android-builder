@@ -55,6 +55,10 @@ on:
         description: "true = service au premier plan qui garde l'audio de la page en lecture en arrière-plan"
         required: false
         default: "false"
+      picture_in_picture:
+        description: "true = passe en mini-fenêtre (Picture-in-Picture) quand on quitte l'app pendant une lecture"
+        required: false
+        default: "false"
 
 permissions:
   contents: read
@@ -89,6 +93,7 @@ jobs:
           DEBUG_CONSOLE: ${{ inputs.debug_console }}
           FIX_IMAGES: ${{ inputs.fix_images }}
           BACKGROUND_PLAYER: ${{ inputs.background_player }}
+          PICTURE_IN_PICTURE: ${{ inputs.picture_in_picture }}
         run: |
           python3 - <<'PY'
           import os, html
@@ -98,6 +103,7 @@ jobs:
           dbg  = "true" if os.environ.get("DEBUG_CONSOLE") == "true" else "false"
           imgs = "true" if os.environ.get("FIX_IMAGES") == "true" else "false"
           bgp  = "true" if os.environ.get("BACKGROUND_PLAYER") == "true" else "false"
+          pip  = "true" if os.environ.get("PICTURE_IN_PICTURE") == "true" else "false"
           with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
               f.write('<?xml version="1.0" encoding="utf-8"?>\n')
               f.write('<resources>\n')
@@ -107,6 +113,7 @@ jobs:
               f.write(f'    <bool name="debug_console">{dbg}</bool>\n')
               f.write(f'    <bool name="fix_images">{imgs}</bool>\n')
               f.write(f'    <bool name="background_player">{bgp}</bool>\n')
+              f.write(f'    <bool name="picture_in_picture">{pip}</bool>\n')
               f.write('</resources>\n')
           PY
 

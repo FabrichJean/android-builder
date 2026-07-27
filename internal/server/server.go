@@ -79,6 +79,7 @@ type createRequest struct {
 	DebugConsole     bool   `json:"debug_console"`
 	FixImages        bool   `json:"fix_images"`
 	BackgroundPlayer bool   `json:"background_player"`
+	PictureInPicture bool   `json:"picture_in_picture"`
 }
 
 var (
@@ -198,19 +199,20 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inputs := map[string]string{
-		"build_id":          id,
-		"app_url":           req.URL,
-		"app_name":          req.AppName,
-		"package_id":        req.Package,
-		"version_name":      req.VersionName,
-		"version_code":      req.VersionCode,
-		"bundle":            "false",
-		"has_icon":          "false",
-		"splash_bg":         splashBg,
-		"hide_scrollbar":    boolStr(req.HideScrollbar),
-		"debug_console":     boolStr(req.DebugConsole),
-		"fix_images":        boolStr(req.FixImages),
-		"background_player": boolStr(req.BackgroundPlayer),
+		"build_id":           id,
+		"app_url":            req.URL,
+		"app_name":           req.AppName,
+		"package_id":         req.Package,
+		"version_name":       req.VersionName,
+		"version_code":       req.VersionCode,
+		"bundle":             "false",
+		"has_icon":           "false",
+		"splash_bg":          splashBg,
+		"hide_scrollbar":     boolStr(req.HideScrollbar),
+		"debug_console":      boolStr(req.DebugConsole),
+		"fix_images":         boolStr(req.FixImages),
+		"background_player":  boolStr(req.BackgroundPlayer),
+		"picture_in_picture": boolStr(req.PictureInPicture),
 	}
 
 	// Heure du dispatch : sert à ne chercher que les runs créés ensuite.
@@ -253,6 +255,7 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	debugConsole := r.FormValue("debug_console") == "true"
 	fixImages := r.FormValue("fix_images") == "true"
 	backgroundPlayer := r.FormValue("background_player") == "true"
+	pictureInPicture := r.FormValue("picture_in_picture") == "true"
 
 	if appName == "" {
 		writeErr(w, http.StatusBadRequest, "app_name est obligatoire")
@@ -387,19 +390,20 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inputs := map[string]string{
-		"build_id":          id,
-		"app_url":           appAssetURL,
-		"app_name":          appName,
-		"package_id":        pkg,
-		"version_name":      vname,
-		"version_code":      vcode,
-		"bundle":            boolStr(bundle),
-		"has_icon":          boolStr(iconData != nil),
-		"splash_bg":         splashBg,
-		"hide_scrollbar":    boolStr(hideScrollbar),
-		"debug_console":     boolStr(debugConsole),
-		"fix_images":        boolStr(fixImages),
-		"background_player": boolStr(backgroundPlayer),
+		"build_id":           id,
+		"app_url":            appAssetURL,
+		"app_name":           appName,
+		"package_id":         pkg,
+		"version_name":       vname,
+		"version_code":       vcode,
+		"bundle":             boolStr(bundle),
+		"has_icon":           boolStr(iconData != nil),
+		"splash_bg":          splashBg,
+		"hide_scrollbar":     boolStr(hideScrollbar),
+		"debug_console":      boolStr(debugConsole),
+		"fix_images":         boolStr(fixImages),
+		"background_player":  boolStr(backgroundPlayer),
+		"picture_in_picture": boolStr(pictureInPicture),
 	}
 
 	dispatchedAt := time.Now()
