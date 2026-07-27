@@ -6,8 +6,8 @@ import (
 	"io/fs"
 )
 
-//go:embed index.html
+//go:embed index.html style.css app.js
 var files embed.FS
 
-// FS renvoie le système de fichiers contenant l'UI (index.html).
+// FS renvoie le système de fichiers contenant l'UI (HTML, CSS, JS).
 func FS() fs.FS { return files }
