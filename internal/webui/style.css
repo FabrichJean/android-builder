@@ -215,9 +215,13 @@
   .prompt-box { position: relative; transition: box-shadow .2s; border-radius: 16px; }
   .prompt-box.drag { box-shadow: 0 0 0 2px var(--sand) inset; }
   .prompt-input {
+    color: var(--text);
     width: 100%; min-height: 92px; max-height: 40vh; resize: none;
     border: none; background: none; box-shadow: none !important;
     padding: 16px 18px 4px; font-size: 16px; font-family: inherit; line-height: 1.5;
+  }
+  .prompt-input:focus {
+  outline: none; /* Supprime le contour natif */
   }
   .prompt-box.has-project .prompt-input { opacity: .4; }
 
