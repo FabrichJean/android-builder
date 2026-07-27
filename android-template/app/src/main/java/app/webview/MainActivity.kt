@@ -2,10 +2,13 @@ package app.webview
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.PictureInPictureParams
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Rational
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.ViewGroup
@@ -31,6 +34,10 @@ class MainActivity : Activity() {
     private var splashHidden = false
     private val fixImages by lazy { resources.getBoolean(R.bool.fix_images) }
     private val backgroundPlayer by lazy { resources.getBoolean(R.bool.background_player) }
+    private val pipEnabled by lazy { resources.getBoolean(R.bool.picture_in_picture) }
+    // Détection play/pause utile aux deux options ci-dessus, pas seulement à background_player.
+    private val needsPlaybackDetection by lazy { backgroundPlayer || pipEnabled }
+    private var isMediaPlaying = false
 
     private lateinit var downloads: Downloads
     private lateinit var mediaLibrary: MediaLibrary
@@ -97,15 +104,15 @@ class MainActivity : Activity() {
                         // Capture les erreurs non gérées et rejets de promesses (fetch).
                         view?.evaluateJavascript(DEBUG_CAPTURE_JS, null)
                     }
-                    if (backgroundPlayer) {
+                    if (backgroundPlayer && !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
                         // Repli pour les WebView trop anciens pour l'injection document-start
                         // (protection partielle : les scripts déjà exécutés au chargement
                         // ont pu enregistrer leur écouteur visibilitychange avant celui-ci).
-                        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-                            view?.evaluateJavascript(VISIBILITY_SPOOF_JS, null)
-                        }
-                        // Détecte play/pause/ended sur tous les <audio>/<video> de la
-                        // page pour démarrer/arrêter le service au premier plan.
+                        view?.evaluateJavascript(VISIBILITY_SPOOF_JS, null)
+                    }
+                    if (needsPlaybackDetection) {
+                        // Détecte play/pause/ended sur tous les <audio>/<video> de la page :
+                        // utile au service d'arrière-plan et/ou au passage en mini-fenêtre (PiP).
                         view?.evaluateJavascript(PLAYBACK_JS, null)
                     }
                     Handler(Looper.getMainLooper()).postDelayed({ hideSplash() }, 500)
@@ -190,9 +197,28 @@ class MainActivity : Activity() {
 
     // Appelé par PlaybackBridge (JS AndroidPlayback) quand la page détecte un
     // <audio>/<video> qui démarre ou dont plus aucun n'est en lecture.
-    fun onBackgroundPlaybackStateChanged(playing: Boolean) {
+    fun onMediaPlaybackStateChanged(playing: Boolean) {
+        isMediaPlaying = playing
         if (!backgroundPlayer) return
         if (playing) BackgroundPlaybackService.start(this) else BackgroundPlaybackService.stop(this)
+    }
+
+    // Appelé quand l'utilisateur quitte l'app (bouton Accueil, app switcher...) :
+    // si un média est en lecture, on passe en mini-fenêtre (PiP) au lieu de
+    // laisser l'app disparaître complètement — plus fiable qu'un simple
+    // service en arrière-plan puisque l'app reste visible, donc jamais limitée.
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (pipEnabled && isMediaPlaying && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+                .build()
+            try {
+                enterPictureInPictureMode(params)
+            } catch (e: IllegalStateException) {
+                // L'appareil peut refuser (ex: mode multi-fenêtre déjà actif) : on ignore.
+            }
+        }
     }
 
     override fun onDestroy() {
