@@ -16,7 +16,7 @@ local.properties
 !/releases/.gitkeep
 
 # zips de dist des exemples (générés)
-examples/*.zip
+examples/
 
 # miniatures (screenshots) générées
 /thumbs/
