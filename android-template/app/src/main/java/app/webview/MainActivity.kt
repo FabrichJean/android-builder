@@ -21,6 +21,8 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 
 class MainActivity : Activity() {
 
@@ -28,6 +30,7 @@ class MainActivity : Activity() {
     private var splash: ViewGroup? = null
     private var splashHidden = false
     private val fixImages by lazy { resources.getBoolean(R.bool.fix_images) }
+    private val backgroundPlayer by lazy { resources.getBoolean(R.bool.background_player) }
 
     private lateinit var downloads: Downloads
     private lateinit var mediaLibrary: MediaLibrary
@@ -70,6 +73,13 @@ class MainActivity : Activity() {
                 isHorizontalScrollBarEnabled = false
                 overScrollMode = WebView.OVER_SCROLL_NEVER
             }
+            // Lecture en arrière-plan : fait croire à la page (et à ses iframes)
+            // qu'elle reste au premier plan, avant même l'exécution de ses
+            // propres scripts — beaucoup de sites vidéo (Facebook, YouTube...)
+            // mettent la lecture en pause dès que document.hidden devient vrai.
+            if (backgroundPlayer && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                WebViewCompat.addDocumentStartJavaScript(this, VISIBILITY_SPOOF_JS, setOf("*"))
+            }
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(
                     view: WebView?,
@@ -87,6 +97,17 @@ class MainActivity : Activity() {
                         // Capture les erreurs non gérées et rejets de promesses (fetch).
                         view?.evaluateJavascript(DEBUG_CAPTURE_JS, null)
                     }
+                    if (backgroundPlayer) {
+                        // Repli pour les WebView trop anciens pour l'injection document-start
+                        // (protection partielle : les scripts déjà exécutés au chargement
+                        // ont pu enregistrer leur écouteur visibilitychange avant celui-ci).
+                        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                            view?.evaluateJavascript(VISIBILITY_SPOOF_JS, null)
+                        }
+                        // Détecte play/pause/ended sur tous les <audio>/<video> de la
+                        // page pour démarrer/arrêter le service au premier plan.
+                        view?.evaluateJavascript(PLAYBACK_JS, null)
+                    }
                     Handler(Looper.getMainLooper()).postDelayed({ hideSplash() }, 500)
                 }
             }
@@ -97,6 +118,7 @@ class MainActivity : Activity() {
             addJavascriptInterface(DownloadBridge(downloads, this@MainActivity), "AndroidDownload")
             addJavascriptInterface(MediaBridge(mediaLibrary), "AndroidMedia")
             addJavascriptInterface(DeviceBridge(deviceCapabilities), "AndroidDevice")
+            addJavascriptInterface(PlaybackBridge(this@MainActivity), "AndroidPlayback")
 
             val dbg = console
             webChromeClient = object : WebChromeClient() {
@@ -166,9 +188,17 @@ class MainActivity : Activity() {
 
     fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
+    // Appelé par PlaybackBridge (JS AndroidPlayback) quand la page détecte un
+    // <audio>/<video> qui démarre ou dont plus aucun n'est en lecture.
+    fun onBackgroundPlaybackStateChanged(playing: Boolean) {
+        if (!backgroundPlayer) return
+        if (playing) BackgroundPlaybackService.start(this) else BackgroundPlaybackService.stop(this)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         mediaLibrary.close()
+        if (backgroundPlayer) BackgroundPlaybackService.stop(this)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -203,4 +233,37 @@ private const val DEBUG_CAPTURE_JS = """(function(){if(window.__dbg)return;windo
      } else { console.error('JS: '+e.message+' @'+e.filename+':'+e.lineno); }
    },true);
    window.addEventListener('unhandledrejection',function(e){var r=e.reason;console.error('Promise: '+((r&&(r.stack||r.message))||r));});
+})();"""
+
+// Détecte la lecture audio/vidéo dans la page pour prévenir le natif (voir
+// PlaybackBridge). "play"/"pause"/"ended" ne remontent pas par bubbling sur
+// les éléments média -> écoute en phase de capture sur document, ce qui
+// fonctionne pour tout <audio>/<video>, y compris ajouté dynamiquement.
+private const val PLAYBACK_JS = """(function(){if(window.__bgplay)return;window.__bgplay=1;
+   function anyPlaying(){
+     var els=document.querySelectorAll('audio,video');
+     for(var i=0;i<els.length;i++){ if(!els[i].paused && !els[i].ended) return true; }
+     return false;
+   }
+   document.addEventListener('play',function(){ try{AndroidPlayback.notifyPlaying();}catch(e){} },true);
+   document.addEventListener('pause',function(){ try{if(!anyPlaying())AndroidPlayback.notifyStopped();}catch(e){} },true);
+   document.addEventListener('ended',function(){ try{if(!anyPlaying())AndroidPlayback.notifyStopped();}catch(e){} },true);
+})();"""
+
+// Fait croire à la page qu'elle reste au premier plan : de nombreux sites
+// vidéo (Facebook, YouTube...) mettent volontairement la lecture en pause dès
+// que document.hidden devient vrai (API Page Visibility). Idéalement injecté
+// en "document start" (avant les scripts de la page, y compris dans les
+// iframes) via WebViewCompat.addDocumentStartJavaScript.
+private const val VISIBILITY_SPOOF_JS = """(function(){if(window.__bgvis)return;window.__bgvis=1;
+   try{
+     Object.defineProperty(document,'hidden',{get:function(){return false;},configurable:true});
+     Object.defineProperty(document,'visibilityState',{get:function(){return 'visible';},configurable:true});
+     document.hasFocus=function(){return true;};
+     var origAdd=EventTarget.prototype.addEventListener;
+     EventTarget.prototype.addEventListener=function(type,listener,options){
+       if(type==='visibilitychange'&&this===document)return;
+       return origAdd.call(this,type,listener,options);
+     };
+   }catch(e){}
 })();"""
