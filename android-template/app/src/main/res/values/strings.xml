@@ -8,4 +8,5 @@
     <bool name="debug_console">false</bool>
     <bool name="fix_images">false</bool>
     <bool name="background_player">false</bool>
+    <bool name="picture_in_picture">false</bool>
 </resources>
