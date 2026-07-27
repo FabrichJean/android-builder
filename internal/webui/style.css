@@ -127,7 +127,7 @@
   .account { margin: 2px 0 12px; }
   .account[hidden], .account-login[hidden], .account-user[hidden], .account-menu[hidden] { display: none; }
   .account-login {
-    display: flex; align-items: center; gap: 9px; width: 100%;
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
     background: #16130c; border: 1px solid var(--border-2); color: var(--text);
     font-family: inherit; font-size: 13px; font-weight: 600;
     padding: 9px 12px; border-radius: 10px; cursor: pointer;
