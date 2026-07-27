@@ -308,7 +308,7 @@
       listURL = url;
     }
 
-    submit.disabled = true; submit.textContent = "Envoi…";
+    submit.disabled = true;
     try {
       const res = await fetch("/api/builds", fetchOpts);
       const data = await res.json();
@@ -326,7 +326,7 @@
     } catch (err) {
       fail(err.message);
     } finally {
-      submit.disabled = false; submit.textContent = "Générer l'APK";
+      submit.disabled = false;
     }
   });
 
