@@ -568,7 +568,10 @@ class MainActivity : Activity() {
         val idCol = MediaStore.MediaColumns._ID
         val sizeCol = MediaStore.MediaColumns.SIZE
         val projection = arrayOf(idCol, nameCol, sizeCol, *extraCols)
-        val sort = "${MediaStore.MediaColumns.DATE_ADDED} DESC LIMIT 300"
+        // Pas de "LIMIT" dans le sortOrder : MediaProvider valide strictement ce
+        // paramètre depuis Android 10 (stockage cloisonné) et rejette tout ce qui
+        // n'est pas juste "colonne ASC/DESC" -> on plafonne dans la boucle à la place.
+        val sort = "${MediaStore.MediaColumns.DATE_ADDED} DESC"
         val out = JSONArray()
         try {
             contentResolver.query(uri, projection, null, null, sort)?.use { c ->
@@ -577,7 +580,7 @@ class MainActivity : Activity() {
                 val sizeIdx = c.getColumnIndexOrThrow(sizeCol)
                 val artistIdx = if (type == "audio") c.getColumnIndex(MediaStore.Audio.Media.ARTIST) else -1
                 val durationIdx = if (type != "image") c.getColumnIndex(MediaStore.MediaColumns.DURATION) else -1
-                while (c.moveToNext()) {
+                while (c.moveToNext() && out.length() < 300) {
                     val id = c.getLong(idIdx)
                     val o = JSONObject()
                     o.put("id", id)
@@ -590,6 +593,7 @@ class MainActivity : Activity() {
                 }
             }
         } catch (e: Exception) {
+            android.util.Log.e("MediaBridge", "listMedia($type) a échoué", e)
             return "[]"
         }
         return out.toString()
@@ -598,7 +602,7 @@ class MainActivity : Activity() {
     // ---- Autres capacités natives (démo) ----
 
     fun vibrateDevice(ms: Long) {
-        val v = getSystemService(VIBRATOR_SERVICE) as? Vibrator ?: return
+        val v = getSystemService(Vibrator::class.java) ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
         } else {
