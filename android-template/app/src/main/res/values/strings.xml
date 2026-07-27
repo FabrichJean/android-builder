@@ -7,4 +7,5 @@
     <bool name="hide_scrollbar">false</bool>
     <bool name="debug_console">false</bool>
     <bool name="fix_images">false</bool>
+    <bool name="background_player">false</bool>
 </resources>
