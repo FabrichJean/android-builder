@@ -51,6 +51,9 @@ type Config struct {
 	// Connexion Google (optionnelle) : historique de builds privé par compte.
 	// Si GoogleClientID/Secret sont vides, la connexion est simplement désactivée
 	// et l'app fonctionne comme avant (historique local au navigateur, partagé).
+	// Noms de variables préfixés LOGIN_ pour ne pas entrer en collision avec un
+	// éventuel autre usage de GOOGLE_CLIENT_ID/SECRET dans le même .env
+	// (ex. une autre app lisant le même fichier pour l'envoi Gmail).
 	BaseURL            string // URL publique de l'app, ex: http://localhost:8080 (sert à construire le redirect Google)
 	GoogleClientID     string
 	GoogleClientSecret string
@@ -74,8 +77,8 @@ func Load() (*Config, error) {
 		Thumbs:             env("THUMBS_DIR", "thumbs"),
 		DB:                 env("DB_PATH", "data.db"),
 		BaseURL:            strings.TrimRight(env("BASE_URL", "http://localhost:"+env("PORT", "8080")), "/"),
-		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleClientID:     os.Getenv("GOOGLE_LOGIN_CLIENT_ID"),
+		GoogleClientSecret: os.Getenv("GOOGLE_LOGIN_CLIENT_SECRET"),
 		SessionSecret:      os.Getenv("SESSION_SECRET"),
 	}
 	if c.SessionSecret == "" {

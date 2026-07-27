@@ -45,7 +45,7 @@ Copier `.env.example` puis renseigner les variables :
 | `RELEASES_DIR`    | Dossier où sont écrits les APK produits          | `releases`     |
 | `DB_PATH`         | Fichier SQLite (builds + historique par utilisateur) | `data.db`  |
 | `BASE_URL`        | URL publique de l'app (sert au redirect OAuth Google) | `http://localhost:$PORT` |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Connexion Google (optionnelle, voir ci-dessous) | — |
+| `GOOGLE_LOGIN_CLIENT_ID` / `GOOGLE_LOGIN_CLIENT_SECRET` | Connexion Google (optionnelle, voir ci-dessous) | — |
 | `SESSION_SECRET`  | Signe les cookies de session (auto-généré si absent) | — |
 
 ### Connexion Google (optionnelle) — historique de builds privé
@@ -67,7 +67,9 @@ Pour l'activer, créer un client OAuth dédié :
    `BASE_URL` + `/auth/google/callback` (ex. `http://localhost:8080/auth/google/callback`
    en local). Cette valeur doit correspondre au caractère près à `BASE_URL` dans `.env`.
 5. Copier le **Client ID** et le **Client Secret** générés dans `.env`
-   (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`).
+   (`GOOGLE_LOGIN_CLIENT_ID` / `GOOGLE_LOGIN_CLIENT_SECRET` — préfixés `LOGIN_`
+   pour ne pas entrer en collision avec un éventuel autre usage de
+   `GOOGLE_CLIENT_ID`/`SECRET` dans le même `.env`).
 
 Tant que l'écran de consentement reste en mode *Testing*, seuls les comptes Google
 ajoutés comme *Test users* (même page) peuvent se connecter.
