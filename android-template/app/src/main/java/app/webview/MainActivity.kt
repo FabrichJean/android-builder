@@ -57,6 +57,7 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URL
+import java.util.concurrent.Executors
 import kotlin.math.abs
 
 class MainActivity : Activity() {
@@ -851,32 +852,46 @@ private class LoopbackMediaServer(
     private val serve: (path: String, range: String?) -> MediaBody?,
 ) : Thread("media-server") {
     private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+    // Pool réutilisable plutôt qu'un Thread natif par connexion : pendant une
+    // recherche (seek), le lecteur vidéo peut ouvrir de nombreuses requêtes en
+    // rafale, et un Thread par connexion a fini par épuiser la mémoire de
+    // l'appareil (déclenchant le tueur mémoire système).
+    private val pool = Executors.newCachedThreadPool()
     val port: Int get() = server.localPort
 
     override fun run() {
         while (!server.isClosed) {
             val socket = try { server.accept() } catch (e: IOException) { return }
-            Thread { handle(socket) }.apply { isDaemon = true }.start()
+            pool.execute { handle(socket) }
         }
     }
 
-    fun close() { try { server.close() } catch (e: IOException) { /* déjà fermé */ } }
+    fun close() {
+        try { server.close() } catch (e: IOException) { /* déjà fermé */ }
+        pool.shutdownNow()
+    }
 
+    // Connexion persistante (keep-alive) : traite toutes les requêtes envoyées
+    // sur le même socket (le lecteur vidéo réutilise la connexion pour chaque
+    // segment/seek au lieu d'en ouvrir une nouvelle à chaque fois).
     private fun handle(socket: Socket) {
         socket.use { s ->
             s.soTimeout = 15000
             try {
                 val reader = s.getInputStream().bufferedReader(Charsets.ISO_8859_1)
-                val requestLine = reader.readLine() ?: return
-                val path = requestLine.split(" ").getOrNull(1)?.substringBefore('?') ?: return
-                var range: String? = null
-                while (true) {
-                    val line = reader.readLine() ?: break
-                    if (line.isEmpty()) break
-                    val i = line.indexOf(':')
-                    if (i > 0 && line.take(i).equals("Range", true)) range = line.substring(i + 1).trim()
+                while (!s.isClosed) {
+                    val requestLine = reader.readLine() ?: break
+                    if (requestLine.isBlank()) continue
+                    val path = requestLine.split(" ").getOrNull(1)?.substringBefore('?') ?: break
+                    var range: String? = null
+                    while (true) {
+                        val line = reader.readLine() ?: return
+                        if (line.isEmpty()) break
+                        val i = line.indexOf(':')
+                        if (i > 0 && line.take(i).equals("Range", true)) range = line.substring(i + 1).trim()
+                    }
+                    writeResponse(s.getOutputStream(), serve(path, range))
                 }
-                writeResponse(s.getOutputStream(), serve(path, range))
             } catch (e: Exception) {
                 // Connexion interrompue par le lecteur (seek, arrêt) : normal.
             }
@@ -885,7 +900,7 @@ private class LoopbackMediaServer(
 
     private fun writeResponse(out: OutputStream, body: MediaBody?) {
         if (body == null) {
-            out.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".toByteArray(Charsets.ISO_8859_1))
+            out.write("HTTP/1.1 404 Not Found\r\nConnection: keep-alive\r\n\r\n".toByteArray(Charsets.ISO_8859_1))
             return
         }
         val status = if (body.partial) "206 Partial Content" else "200 OK"
@@ -895,9 +910,10 @@ private class LoopbackMediaServer(
             append("Content-Length: ${body.length}\r\n")
             append("Accept-Ranges: bytes\r\n")
             if (body.partial) append("Content-Range: bytes ${body.start}-${body.end}/${body.total}\r\n")
-            append("Connection: close\r\n\r\n")
+            append("Connection: keep-alive\r\n\r\n")
         }
         out.write(headers.toByteArray(Charsets.ISO_8859_1))
         body.stream.use { it.copyTo(out) }
+        out.flush()
     }
 }
