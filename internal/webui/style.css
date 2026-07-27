@@ -408,7 +408,6 @@
     max-width: 1140px; margin: 0 auto; padding: 40px 24px 80px;
   }
   .gallery-panel {
-    background: rgba(28,24,15,0.72);
     border: 1px solid var(--border);
     border-radius: 20px;
     padding: 18px;
@@ -417,6 +416,13 @@
   }
   .gallery-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
   .gallery-title { font-size: 19px; font-weight: 750; margin: 0; flex: 1; min-width: 160px; letter-spacing: -0.01em; }
+  .recent-viewall {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: none; border: none; cursor: pointer;
+    color: var(--sand); font-family: inherit; font-size: 13px; font-weight: 650;
+  }
+  .recent-viewall:hover { color: var(--sand-dim); }
+  .recent-viewall .ic { width: 14px; height: 14px; }
   .tabs { display: flex; gap: 4px; background: #100d08; border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
   .tab {
     border: none; background: transparent; cursor: pointer; font-family: inherit;

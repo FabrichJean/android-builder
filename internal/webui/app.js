@@ -1,6 +1,8 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const form = $("form"), submit = $("submit"), formError = $("formError"), buildsEl = $("builds");
+  const recentEl = $("recentBuilds");
+  const RECENT_COUNT = 6;
   const STORE_KEY = "apk-builder-builds";
 
   const STATUS = {
@@ -141,8 +143,29 @@
       const p = el.querySelector(".pcard-pill"); if (p) p.outerHTML = pillHTML(b);
       const body = el.querySelector(".pcard-body"); if (body) body.innerHTML = bodyHTML(b);
     }
+    patchRecent(b);
     patchActive(b); // met à jour le dock des builds en cours
   }
+
+  // ---- "Builds récents" sur l'Accueil (aperçu, toujours les N derniers) ----
+  function renderRecent() {
+    const list = builds.slice(0, RECENT_COUNT);
+    recentEl.innerHTML = list.length ? list.map(card).join("")
+      : `<div class="builds-empty">Aucun build pour l'instant — crée ta première app ci-dessus.</div>`;
+  }
+  function patchRecent(b) {
+    const inTop = builds.slice(0, RECENT_COUNT).some(x => x.id === b.id);
+    const el = recentEl.querySelector(`.pcard[data-card="${b.id}"]`);
+    if (!inTop) { if (el) renderRecent(); return; }
+    if (!el) { renderRecent(); return; }
+    const p = el.querySelector(".pcard-pill"); if (p) p.outerHTML = pillHTML(b);
+    const body = el.querySelector(".pcard-body"); if (body) body.innerHTML = bodyHTML(b);
+  }
+  recentEl.addEventListener("click", (e) => {
+    const id = e.target.getAttribute?.("data-remove");
+    if (id) { builds = builds.filter(b => b.id !== id); save(); render(); }
+  });
+  $("recentViewAll").addEventListener("click", () => switchView("history"));
 
   // ---- dock flottant des builds en cours ----
   const activeBuilds = () => builds.filter(b => b.status === "pending" || b.status === "building");
@@ -193,10 +216,10 @@
       buildsEl.innerHTML = `<div class="builds-empty">${builds.length
         ? "Aucun build ne correspond."
         : "Aucun build pour l'instant — crée ta première app ci-dessus."}</div>`;
-      renderActive();
-      return;
+    } else {
+      buildsEl.innerHTML = list.map(card).join("");
     }
-    buildsEl.innerHTML = list.map(card).join("");
+    renderRecent();
     renderActive();
   }
 
@@ -322,7 +345,6 @@
       save(); render(); subscribe(data.id);
       pollThumbs(0);
       form.reset(); clearDist(); clearIcon(); syncSplash(); updatePreview();
-      switchView("history"); // le build vient d'être créé : direction l'historique pour le suivre
     } catch (err) {
       fail(err.message);
     } finally {
