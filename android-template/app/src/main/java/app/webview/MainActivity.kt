@@ -32,6 +32,7 @@ import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -69,12 +70,14 @@ class MainActivity : Activity() {
     private val fixImages by lazy { resources.getBoolean(R.bool.fix_images) }
     private val pendingMediaPermission = HashMap<Int, String>()
     private var mediaServer: LoopbackMediaServer? = null
+    private var pendingWebRequest: PermissionRequest? = null
 
     private companion object {
         const val REQ_STORAGE = 4711
         const val REQ_MEDIA_AUDIO = 4801
         const val REQ_MEDIA_VIDEO = 4802
         const val REQ_MEDIA_IMAGE = 4803
+        const val REQ_WEBRTC = 4901
         const val MAX_IMAGE_BYTES = 25 * 1024 * 1024
     }
 
@@ -159,12 +162,20 @@ class MainActivity : Activity() {
             addJavascriptInterface(DeviceBridge(this@MainActivity), "AndroidDevice")
 
             val dbg = console
-            webChromeClient = if (dbg != null) object : WebChromeClient() {
+            webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(m: ConsoleMessage): Boolean {
+                    if (dbg == null) return super.onConsoleMessage(m)
                     dbg.append("[${m.messageLevel()}] ${m.message()}  (${m.sourceId()}:${m.lineNumber()})")
                     return true
                 }
-            } else WebChromeClient()
+
+                // getUserMedia() (caméra/micro WebRTC) : la WebView demande ici les
+                // "ressources" web ; on les relaie vers les permissions Android
+                // runtime correspondantes puis on accorde/refuse en conséquence.
+                override fun onPermissionRequest(request: PermissionRequest) {
+                    handleWebPermissionRequest(request)
+                }
+            }
         }
 
         val root = FrameLayout(this)
@@ -527,11 +538,57 @@ class MainActivity : Activity() {
             if (granted) action?.invoke() else toast("Permission de stockage refusée")
             return
         }
+        if (requestCode == REQ_WEBRTC) {
+            val req = pendingWebRequest
+            pendingWebRequest = null
+            if (req == null) return
+            // Accorde uniquement les ressources dont la permission Android est
+            // effectivement accordée (l'utilisateur peut n'en accepter qu'une).
+            val allowed = req.resources.filter { res ->
+                webPermissionFor(res)?.let {
+                    checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
+                } ?: false
+            }
+            if (allowed.isEmpty()) req.deny() else req.grant(allowed.toTypedArray())
+            return
+        }
         val mediaType = pendingMediaPermission.remove(requestCode) ?: return
         webView.evaluateJavascript(
             "window.onMediaPermission && window.onMediaPermission(${JSONObject.quote(mediaType)}, $granted);",
             null,
         )
+    }
+
+    // ---- Caméra / micro (getUserMedia dans la page) ----
+
+    // Ressource WebView -> permission Android runtime correspondante.
+    private fun webPermissionFor(resource: String): String? = when (resource) {
+        PermissionRequest.RESOURCE_VIDEO_CAPTURE -> Manifest.permission.CAMERA
+        PermissionRequest.RESOURCE_AUDIO_CAPTURE -> Manifest.permission.RECORD_AUDIO
+        else -> null
+    }
+
+    private fun handleWebPermissionRequest(request: PermissionRequest) {
+        // Sécurité : ne répond qu'aux demandes venant de l'app elle-même
+        // (dist embarqué sur le domaine virtuel, ou l'URL configurée au build).
+        val origin = request.origin?.host ?: ""
+        val appHost = Uri.parse(getString(R.string.app_url)).host ?: ""
+        if (origin != "appassets.androidplatform.net" && origin != appHost) {
+            request.deny()
+            return
+        }
+        val wanted = request.resources.mapNotNull { webPermissionFor(it) }.distinct()
+        if (wanted.isEmpty()) { request.deny(); return }
+
+        val missing = wanted.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isEmpty()) {
+            request.grant(request.resources.filter { webPermissionFor(it) != null }.toTypedArray())
+            return
+        }
+        // Une seule demande WebRTC à la fois : la précédente encore en vol est refusée.
+        pendingWebRequest?.deny()
+        pendingWebRequest = request
+        requestPermissions(missing.toTypedArray(), REQ_WEBRTC)
     }
 
     fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
