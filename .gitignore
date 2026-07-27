@@ -5,6 +5,10 @@
 # Env
 .env
 
+# Base SQLite (builds + historique par utilisateur)
+*.db
+*.db-*
+
 # Android / Gradle
 .gradle/
 **/build/

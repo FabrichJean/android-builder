@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/example/android-builder/internal/auth"
 	"github.com/example/android-builder/internal/buildstore"
 	"github.com/example/android-builder/internal/config"
 	"github.com/example/android-builder/internal/ghclient"
@@ -31,9 +32,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	store, err := buildstore.Open(cfg.DB)
+	if err != nil {
+		log.Error("base de données inaccessible", "path", cfg.DB, "err", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
+	authMgr := auth.New(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.BaseURL, cfg.SessionSecret)
+	if authMgr.Enabled() {
+		log.Info("connexion Google activée", "redirect", cfg.BaseURL+"/auth/google/callback")
+	}
+
 	gh := ghclient.New(cfg.Token, cfg.Owner, cfg.Repo, cfg.Workflow)
-	store := buildstore.New()
-	srv := server.New(cfg, gh, store, log)
+	srv := server.New(cfg, gh, store, authMgr, log)
 
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,
