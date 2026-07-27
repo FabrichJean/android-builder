@@ -4,7 +4,10 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.DownloadManager
+import android.content.ContentResolver
+import android.content.ContentUris
 import android.content.ContentValues
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.AssetManager
 import android.graphics.Color
@@ -12,10 +15,13 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
+import android.os.BatteryManager
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.provider.MediaStore
 import android.text.method.ScrollingMovementMethod
 import android.util.Base64
@@ -40,6 +46,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.webkit.WebViewAssetLoader
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
@@ -54,9 +62,13 @@ class MainActivity : Activity() {
     private var splashHidden = false
     private var pendingDownload: (() -> Unit)? = null
     private val fixImages by lazy { resources.getBoolean(R.bool.fix_images) }
+    private val pendingMediaPermission = HashMap<Int, String>()
 
     private companion object {
         const val REQ_STORAGE = 4711
+        const val REQ_MEDIA_AUDIO = 4801
+        const val REQ_MEDIA_VIDEO = 4802
+        const val REQ_MEDIA_IMAGE = 4803
         const val MAX_IMAGE_BYTES = 25 * 1024 * 1024
     }
 
@@ -67,6 +79,7 @@ class MainActivity : Activity() {
         // Sert le dist embarqué (assets/www) sur https://appassets.androidplatform.net/
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/", WwwPathHandler(assets))
+            .addPathHandler("/media/", MediaPathHandler(contentResolver))
             .build()
 
         // Console de debug optionnelle : widget flottant réductible et déplaçable.
@@ -128,6 +141,8 @@ class MainActivity : Activity() {
                 startDownload(url, userAgent, contentDisposition, mimetype)
             }
             addJavascriptInterface(DownloadBridge(this@MainActivity), "AndroidDownload")
+            addJavascriptInterface(MediaBridge(this@MainActivity), "AndroidMedia")
+            addJavascriptInterface(DeviceBridge(this@MainActivity), "AndroidDevice")
 
             val dbg = console
             webChromeClient = if (dbg != null) object : WebChromeClient() {
@@ -491,15 +506,119 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
         if (requestCode == REQ_STORAGE) {
-            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
             val action = pendingDownload
             pendingDownload = null
             if (granted) action?.invoke() else toast("Permission de stockage refusée")
+            return
         }
+        val mediaType = pendingMediaPermission.remove(requestCode) ?: return
+        webView.evaluateJavascript(
+            "window.onMediaPermission && window.onMediaPermission(${JSONObject.quote(mediaType)}, $granted);",
+            null,
+        )
     }
 
     fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    // ---- Médiathèque (musique / vidéos / photos) ----
+
+    private fun mediaPermissionName(type: String): String = when {
+        Build.VERSION.SDK_INT >= 33 && type == "audio" -> Manifest.permission.READ_MEDIA_AUDIO
+        Build.VERSION.SDK_INT >= 33 && type == "video" -> Manifest.permission.READ_MEDIA_VIDEO
+        Build.VERSION.SDK_INT >= 33 && type == "image" -> Manifest.permission.READ_MEDIA_IMAGES
+        else -> Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+    fun hasMediaPermission(type: String): Boolean =
+        checkSelfPermission(mediaPermissionName(type)) == PackageManager.PERMISSION_GRANTED
+
+    fun requestMediaPermission(type: String) = runOnUiThread {
+        if (hasMediaPermission(type)) {
+            webView.evaluateJavascript("window.onMediaPermission && window.onMediaPermission(${JSONObject.quote(type)}, true);", null)
+            return@runOnUiThread
+        }
+        val code = when (type) { "audio" -> REQ_MEDIA_AUDIO; "video" -> REQ_MEDIA_VIDEO; else -> REQ_MEDIA_IMAGE }
+        pendingMediaPermission[code] = type
+        requestPermissions(arrayOf(mediaPermissionName(type)), code)
+    }
+
+    // Interroge le MediaStore et renvoie un JSON avec l'URL de streaming (servie
+    // par MediaPathHandler via le domaine virtuel https de la WebView).
+    fun listMedia(type: String): String {
+        if (!hasMediaPermission(type)) return "[]"
+        val (uri, nameCol, extraCols) = when (type) {
+            "audio" -> Triple(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                MediaStore.Audio.Media.DISPLAY_NAME,
+                arrayOf(MediaStore.Audio.Media.ARTIST, MediaStore.Audio.Media.DURATION),
+            )
+            "video" -> Triple(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                MediaStore.Video.Media.DISPLAY_NAME,
+                arrayOf(MediaStore.Video.Media.DURATION),
+            )
+            else -> Triple(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                MediaStore.Images.Media.DISPLAY_NAME,
+                emptyArray(),
+            )
+        }
+        val idCol = MediaStore.MediaColumns._ID
+        val sizeCol = MediaStore.MediaColumns.SIZE
+        val projection = arrayOf(idCol, nameCol, sizeCol, *extraCols)
+        val sort = "${MediaStore.MediaColumns.DATE_ADDED} DESC LIMIT 300"
+        val out = JSONArray()
+        try {
+            contentResolver.query(uri, projection, null, null, sort)?.use { c ->
+                val idIdx = c.getColumnIndexOrThrow(idCol)
+                val nameIdx = c.getColumnIndexOrThrow(nameCol)
+                val sizeIdx = c.getColumnIndexOrThrow(sizeCol)
+                val artistIdx = if (type == "audio") c.getColumnIndex(MediaStore.Audio.Media.ARTIST) else -1
+                val durationIdx = if (type != "image") c.getColumnIndex(MediaStore.MediaColumns.DURATION) else -1
+                while (c.moveToNext()) {
+                    val id = c.getLong(idIdx)
+                    val o = JSONObject()
+                    o.put("id", id)
+                    o.put("name", c.getString(nameIdx) ?: "")
+                    o.put("size", c.getLong(sizeIdx))
+                    o.put("url", "https://appassets.androidplatform.net/media/$type/$id")
+                    if (artistIdx >= 0) o.put("artist", c.getString(artistIdx) ?: "")
+                    if (durationIdx >= 0) o.put("duration", c.getLong(durationIdx))
+                    out.put(o)
+                }
+            }
+        } catch (e: Exception) {
+            return "[]"
+        }
+        return out.toString()
+    }
+
+    // ---- Autres capacités natives (démo) ----
+
+    fun vibrateDevice(ms: Long) {
+        val v = getSystemService(VIBRATOR_SERVICE) as? Vibrator ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            v.vibrate(ms)
+        }
+    }
+
+    fun shareText(text: String) = runOnUiThread {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(intent, null))
+    }
+
+    fun batteryLevel(): Int {
+        val bm = getSystemService(BATTERY_SERVICE) as BatteryManager
+        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    }
 
     private fun extFromMime(mime: String): String = when (mime.substringBefore(';').trim()) {
         "image/png" -> ".png"
@@ -550,6 +669,34 @@ private class DownloadBridge(private val activity: MainActivity) {
 }
 
 /**
+ * Pont JS pour lire la médiathèque du téléphone (musique/vidéos/photos).
+ * `list(type)` renvoie un JSON avec, pour chaque élément, une `url` https
+ * jouable/affichable directement (servie par [MediaPathHandler]).
+ */
+private class MediaBridge(private val activity: MainActivity) {
+    @JavascriptInterface
+    fun hasPermission(type: String): Boolean = activity.hasMediaPermission(type)
+
+    @JavascriptInterface
+    fun requestPermission(type: String) = activity.requestMediaPermission(type)
+
+    @JavascriptInterface
+    fun list(type: String): String = activity.listMedia(type)
+}
+
+/** Pont JS pour quelques capacités natives supplémentaires (démo). */
+private class DeviceBridge(private val activity: MainActivity) {
+    @JavascriptInterface
+    fun vibrate(ms: Long) = activity.vibrateDevice(ms)
+
+    @JavascriptInterface
+    fun share(text: String) = activity.shareText(text)
+
+    @JavascriptInterface
+    fun batteryLevel(): Int = activity.batteryLevel()
+}
+
+/**
  * Sert les fichiers du dossier assets/www comme si www/ était la racine du site.
  * Une requête vers https://appassets.androidplatform.net/assets/x.js renvoie
  * assets/www/assets/x.js — d'où le support des chemins absolus des SPA.
@@ -596,5 +743,36 @@ private class WwwPathHandler(
         "wasm" -> "application/wasm"
         "txt" -> "text/plain"
         else -> "application/octet-stream"
+    }
+}
+
+/**
+ * Diffuse un élément de la médiathèque (musique/vidéo/photo) via le domaine
+ * virtuel https de la WebView. Chemin attendu : "<type>/<id>" (ex. "audio/123"),
+ * tel que renvoyé par [MainActivity.listMedia] dans le champ `url`.
+ */
+private class MediaPathHandler(
+    private val resolver: ContentResolver,
+) : WebViewAssetLoader.PathHandler {
+    override fun handle(path: String): WebResourceResponse? {
+        val clean = Uri.decode(path).trim('/')
+        val parts = clean.split('/', limit = 2)
+        if (parts.size != 2) return null
+        val type = parts[0]
+        val id = parts[1].toLongOrNull() ?: return null
+        val base = when (type) {
+            "audio" -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            "video" -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            "image" -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            else -> return null
+        }
+        val uri = ContentUris.withAppendedId(base, id)
+        return try {
+            val stream = resolver.openInputStream(uri) ?: return null
+            val mime = resolver.getType(uri) ?: "application/octet-stream"
+            WebResourceResponse(mime, null, stream)
+        } catch (e: Exception) {
+            null
+        }
     }
 }
