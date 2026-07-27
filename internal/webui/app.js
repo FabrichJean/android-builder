@@ -315,6 +315,7 @@
     fd.append("hide_scrollbar", $("hideScrollbar").checked ? "true" : "false");
     fd.append("debug_console", $("debugConsole").checked ? "true" : "false");
     fd.append("fix_images", $("fixImages").checked ? "true" : "false");
+    fd.append("background_player", $("backgroundPlayer").checked ? "true" : "false");
     if (iconBlob) fd.append("icon", iconBlob, "icon.png");
 
     let fetchOpts, listURL;
