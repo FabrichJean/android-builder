@@ -87,6 +87,16 @@ class MainActivity : Activity() {
             if (backgroundPlayer && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
                 WebViewCompat.addDocumentStartJavaScript(this, VISIBILITY_SPOOF_JS, setOf("*"))
             }
+            // Mode mini-fenêtre (PiP) : en entrant réellement en PiP, la fenêtre
+            // (et donc window.innerWidth/innerHeight) rétrécit pour de vrai —
+            // certains sites (YouTube...) réagissent à ce redimensionnement en
+            // mettant la lecture en pause. On fige la taille rapportée à la page
+            // sur sa valeur d'origine. Best-effort : le rendu réel reste petit,
+            // seule la taille *rapportée* en JS est figée (risque de décalages
+            // visuels sur des pages qui ajustent finement leur layout dessus).
+            if (pipEnabled && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                WebViewCompat.addDocumentStartJavaScript(this, VIEWPORT_SPOOF_JS, setOf("*"))
+            }
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(
                     view: WebView?,
@@ -104,11 +114,14 @@ class MainActivity : Activity() {
                         // Capture les erreurs non gérées et rejets de promesses (fetch).
                         view?.evaluateJavascript(DEBUG_CAPTURE_JS, null)
                     }
+                    // Replis pour les WebView trop anciens pour l'injection document-start
+                    // (protection partielle : les scripts déjà exécutés au chargement ont pu
+                    // agir avant celui-ci).
                     if (backgroundPlayer && !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-                        // Repli pour les WebView trop anciens pour l'injection document-start
-                        // (protection partielle : les scripts déjà exécutés au chargement
-                        // ont pu enregistrer leur écouteur visibilitychange avant celui-ci).
                         view?.evaluateJavascript(VISIBILITY_SPOOF_JS, null)
+                    }
+                    if (pipEnabled && !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                        view?.evaluateJavascript(VIEWPORT_SPOOF_JS, null)
                     }
                     if (needsPlaybackDetection) {
                         // Détecte play/pause/ended sur tous les <audio>/<video> de la page :
@@ -291,5 +304,45 @@ private const val VISIBILITY_SPOOF_JS = """(function(){if(window.__bgvis)return;
        if(type==='visibilitychange'&&this===document)return;
        return origAdd.call(this,type,listener,options);
      };
+   }catch(e){}
+})();"""
+
+// Fige la taille de fenêtre rapportée en JS (expérimental) : certains sites
+// (YouTube...) réagissent au vrai rétrécissement de fenêtre en PiP en mettant
+// la lecture en pause. On fige innerWidth/innerHeight/outerWidth/outerHeight
+// sur leur valeur d'origine, on bloque l'événement "resize" sur window, et on
+// fait de même pour ResizeObserver (best-effort : ne couvre pas tous les
+// signaux possibles qu'une page peut utiliser pour détecter sa vraie taille).
+private const val VIEWPORT_SPOOF_JS = """(function(){if(window.__bgresize)return;window.__bgresize=1;
+   try{
+     var fw=window.innerWidth, fh=window.innerHeight;
+     var fow=window.outerWidth, foh=window.outerHeight;
+     Object.defineProperty(window,'innerWidth',{get:function(){return fw;},configurable:true});
+     Object.defineProperty(window,'innerHeight',{get:function(){return fh;},configurable:true});
+     Object.defineProperty(window,'outerWidth',{get:function(){return fow;},configurable:true});
+     Object.defineProperty(window,'outerHeight',{get:function(){return foh;},configurable:true});
+   }catch(e){}
+   try{
+     var origAdd=EventTarget.prototype.addEventListener;
+     EventTarget.prototype.addEventListener=function(type,listener,options){
+       if(type==='resize'&&this===window)return;
+       return origAdd.call(this,type,listener,options);
+     };
+   }catch(e){}
+   try{
+     if(window.ResizeObserver){
+       var NativeRO=window.ResizeObserver;
+       window.ResizeObserver=function(callback){
+         var frozen=new WeakMap();
+         return new NativeRO(function(entries,observer){
+           var patched=entries.map(function(entry){
+             if(!frozen.has(entry.target))frozen.set(entry.target,entry);
+             return frozen.get(entry.target);
+           });
+           callback(patched,observer);
+         });
+       };
+       window.ResizeObserver.prototype=NativeRO.prototype;
+     }
    }catch(e){}
 })();"""
