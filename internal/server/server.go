@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/example/android-builder/internal/auth"
 	"github.com/example/android-builder/internal/buildstore"
 	"github.com/example/android-builder/internal/config"
 	"github.com/example/android-builder/internal/ghclient"
@@ -30,18 +31,19 @@ type Server struct {
 	cfg    *config.Config
 	gh     *ghclient.Client
 	store  *buildstore.Store
+	auth   *auth.Manager
 	log    *slog.Logger
 	chrome string        // binaire Chrome pour les miniatures ("" si absent)
 	sem    chan struct{} // limite les captures Chrome concurrentes
 }
 
-func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, log *slog.Logger) *Server {
+func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, authMgr *auth.Manager, log *slog.Logger) *Server {
 	chrome := thumb.ChromePath()
 	if chrome == "" {
 		log.Warn("Chrome introuvable — miniatures désactivées (installe Chrome ou définis CHROME_PATH)")
 	}
 	return &Server{
-		cfg: cfg, gh: gh, store: store, log: log,
+		cfg: cfg, gh: gh, store: store, auth: authMgr, log: log,
 		chrome: chrome,
 		sem:    make(chan struct{}, 2),
 	}
@@ -56,6 +58,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/builds/{id}/events", s.handleEvents)
 	mux.HandleFunc("GET /api/builds/{id}/apk", s.handleDownloadAPK)
 	mux.HandleFunc("GET /api/builds/{id}/thumb", s.handleThumb)
+	mux.HandleFunc("GET /api/builds", s.handleListBuilds)
+	mux.HandleFunc("GET /api/me", s.handleMe)
+	mux.HandleFunc("GET /auth/google/login", s.handleGoogleLogin)
+	mux.HandleFunc("GET /auth/google/callback", s.handleGoogleCallback)
+	mux.HandleFunc("POST /auth/logout", s.handleLogout)
 	// Interface web statique (index.html embarqué) sur toutes les autres routes.
 	mux.Handle("GET /", http.FileServerFS(webui.FS()))
 	return mux
@@ -176,6 +183,7 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 	id := newID()
 	build := &buildstore.Build{
 		ID:       id,
+		UserID:   s.currentUserID(r),
 		URL:      req.URL,
 		AppName:  req.AppName,
 		Package:  req.Package,
@@ -183,7 +191,10 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 		SplashBg: splashBg,
 		Status:   buildstore.StatusPending,
 	}
-	s.store.Create(build)
+	if err := s.store.Create(build); err != nil {
+		writeErr(w, http.StatusInternalServerError, "enregistrement du build impossible: "+err.Error())
+		return
+	}
 
 	inputs := map[string]string{
 		"build_id":       id,
@@ -332,6 +343,7 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	}
 	build := &buildstore.Build{
 		ID:       id,
+		UserID:   s.currentUserID(r),
 		URL:      displayURL,
 		AppName:  appName,
 		Package:  pkg,
@@ -340,7 +352,10 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 		HasIcon:  iconData != nil,
 		Status:   buildstore.StatusPending,
 	}
-	s.store.Create(build)
+	if err := s.store.Create(build); err != nil {
+		writeErr(w, http.StatusInternalServerError, "enregistrement du build impossible: "+err.Error())
+		return
+	}
 
 	// Relais des assets binaires via une release temporaire (si nécessaire).
 	var cleanup func()
@@ -715,4 +730,91 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
+}
+
+// ---- Connexion Google (optionnelle) ----
+
+// currentUserID renvoie l'ID Google de la session en cours, ou "" si anonyme.
+func (s *Server) currentUserID(r *http.Request) string {
+	u, ok := s.auth.UserFromRequest(r)
+	if !ok {
+		return ""
+	}
+	return u.ID
+}
+
+// handleMe renvoie l'état de connexion courant (pour afficher le bouton
+// connexion/déconnexion et l'avatar côté interface web).
+func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	if !s.auth.Enabled() {
+		writeJSON(w, http.StatusOK, map[string]any{"enabled": false, "logged_in": false})
+		return
+	}
+	u, ok := s.auth.UserFromRequest(r)
+	if !ok {
+		writeJSON(w, http.StatusOK, map[string]any{"enabled": true, "logged_in": false})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"enabled": true, "logged_in": true, "user": u})
+}
+
+// handleListBuilds renvoie l'historique privé de l'utilisateur connecté.
+// Anonyme -> liste vide (l'interface retombe sur son historique localStorage).
+func (s *Server) handleListBuilds(w http.ResponseWriter, r *http.Request) {
+	userID := s.currentUserID(r)
+	if userID == "" {
+		writeJSON(w, http.StatusOK, []any{})
+		return
+	}
+	builds, err := s.store.List(userID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "lecture de l'historique impossible: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, builds)
+}
+
+func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.auth.Enabled() {
+		writeErr(w, http.StatusNotFound, "connexion Google non configurée")
+		return
+	}
+	url, err := s.auth.BeginLogin(w)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	http.Redirect(w, r, url, http.StatusFound)
+}
+
+func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
+	if !s.auth.Enabled() {
+		writeErr(w, http.StatusNotFound, "connexion Google non configurée")
+		return
+	}
+	if !s.auth.CheckState(r) {
+		writeErr(w, http.StatusBadRequest, "état OAuth invalide (CSRF ?)")
+		return
+	}
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		writeErr(w, http.StatusBadRequest, "code d'autorisation manquant")
+		return
+	}
+	u, err := s.auth.Exchange(r.Context(), code)
+	if err != nil {
+		s.log.Error("échange OAuth Google échoué", "err", err)
+		writeErr(w, http.StatusBadGateway, "connexion Google impossible: "+err.Error())
+		return
+	}
+	if err := s.auth.SetSession(w, u); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	s.auth.ClearSession(w)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

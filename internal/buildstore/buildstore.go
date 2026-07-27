@@ -1,11 +1,15 @@
-// Package buildstore conserve l'état des builds en cours et terminés.
-// Implémentation en mémoire, protégée par un mutex (suffisant pour un MVP ;
-// remplaçable par Redis/DB via la même interface).
+// Package buildstore conserve l'état des builds en cours et terminés, dans un
+// fichier SQLite (survit aux redémarrages). UserID (vide pour les builds
+// anonymes) permet un historique privé par compte Google connecté.
 package buildstore
 
 import (
+	"database/sql"
+	"encoding/json"
 	"sync"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 // Status décrit l'étape courante d'un build.
@@ -28,6 +32,7 @@ type Step struct {
 // Build représente une demande de construction d'APK.
 type Build struct {
 	ID          string    `json:"id"`
+	UserID      string    `json:"user_id,omitempty"` // vide = build anonyme (pas d'historique serveur)
 	URL         string    `json:"url"`
 	AppName     string    `json:"app_name"`
 	Package     string    `json:"package"`
@@ -46,65 +51,192 @@ type Build struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// Store est un dépôt thread-safe de builds.
+const schema = `
+CREATE TABLE IF NOT EXISTS builds (
+	id            TEXT PRIMARY KEY,
+	user_id       TEXT NOT NULL DEFAULT '',
+	url           TEXT NOT NULL DEFAULT '',
+	app_name      TEXT NOT NULL DEFAULT '',
+	package       TEXT NOT NULL DEFAULT '',
+	mode          TEXT NOT NULL DEFAULT '',
+	splash_bg     TEXT NOT NULL DEFAULT '',
+	has_icon      INTEGER NOT NULL DEFAULT 0,
+	status        TEXT NOT NULL DEFAULT '',
+	error         TEXT NOT NULL DEFAULT '',
+	run_id        INTEGER NOT NULL DEFAULT 0,
+	run_url       TEXT NOT NULL DEFAULT '',
+	apk_path      TEXT NOT NULL DEFAULT '',
+	steps_json    TEXT NOT NULL DEFAULT '[]',
+	progress      INTEGER NOT NULL DEFAULT 0,
+	current_step  TEXT NOT NULL DEFAULT '',
+	created_at    INTEGER NOT NULL DEFAULT 0,
+	updated_at    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_builds_user ON builds(user_id, created_at DESC);
+`
+
+// Store est un dépôt de builds persisté en SQLite.
+// Un mutex protège les cycles lecture-modification-écriture (Update) : le
+// pilote SQLite sérialise déjà les écritures, mais on veut aussi que
+// l'application de fn() soit atomique du point de vue de l'appelant.
 type Store struct {
-	mu     sync.RWMutex
-	builds map[string]*Build
+	db *sql.DB
+	mu sync.Mutex
 }
 
-func New() *Store {
-	return &Store{builds: make(map[string]*Build)}
+// Open ouvre (ou crée) la base SQLite au chemin donné.
+func Open(path string) (*Store, error) {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1) // sqlite : une seule connexion évite les "database is locked"
+	if _, err := db.Exec(schema); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return &Store{db: db}, nil
 }
+
+func (s *Store) Close() error { return s.db.Close() }
 
 // Create enregistre un nouveau build.
-func (s *Store) Create(b *Build) {
-	b.CreatedAt = time.Now()
-	b.UpdatedAt = b.CreatedAt
-	s.mu.Lock()
-	s.builds[b.ID] = b
-	s.mu.Unlock()
+func (s *Store) Create(b *Build) error {
+	now := time.Now()
+	b.CreatedAt = now
+	b.UpdatedAt = now
+	return s.insert(b)
+}
+
+func (s *Store) insert(b *Build) error {
+	stepsJSON, _ := json.Marshal(b.Steps)
+	_, err := s.db.Exec(
+		`INSERT INTO builds (id, user_id, url, app_name, package, mode, splash_bg, has_icon,
+			status, error, run_id, run_url, apk_path, steps_json, progress, current_step,
+			created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		b.ID, b.UserID, b.URL, b.AppName, b.Package, b.Mode, b.SplashBg, boolToInt(b.HasIcon),
+		string(b.Status), b.Error, b.RunID, b.RunURL, b.APKPath, string(stepsJSON), b.Progress, b.CurrentStep,
+		b.CreatedAt.UnixMilli(), b.UpdatedAt.UnixMilli(),
+	)
+	return err
 }
 
 // Get renvoie une copie du build.
 func (s *Store) Get(id string) (*Build, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	b, ok := s.builds[id]
-	if !ok {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b, err := s.get(id)
+	if err != nil {
 		return nil, false
 	}
-	cp := *b
-	return &cp, true
+	return b, true
+}
+
+func (s *Store) get(id string) (*Build, error) {
+	row := s.db.QueryRow(
+		`SELECT id, user_id, url, app_name, package, mode, splash_bg, has_icon,
+			status, error, run_id, run_url, apk_path, steps_json, progress, current_step,
+			created_at, updated_at
+		FROM builds WHERE id = ?`, id,
+	)
+	return scanBuild(row)
+}
+
+// List renvoie l'historique d'un utilisateur (le plus récent d'abord).
+// userID vide -> tranche vide (les builds anonymes n'ont pas d'historique serveur).
+func (s *Store) List(userID string) ([]*Build, error) {
+	if userID == "" {
+		return nil, nil
+	}
+	rows, err := s.db.Query(
+		`SELECT id, user_id, url, app_name, package, mode, splash_bg, has_icon,
+			status, error, run_id, run_url, apk_path, steps_json, progress, current_step,
+			created_at, updated_at
+		FROM builds WHERE user_id = ? ORDER BY created_at DESC LIMIT 200`, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []*Build{}
+	for rows.Next() {
+		b, err := scanBuild(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
 }
 
 // APKPath renvoie le chemin du fichier APK d'un build réussi.
 func (s *Store) APKPath(id string) (string, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	b, ok := s.builds[id]
+	b, ok := s.Get(id)
 	if !ok || b.APKPath == "" {
 		return "", false
 	}
 	return b.APKPath, true
 }
 
-// Update applique une mutation au build sous verrou.
+// Update applique une mutation au build sous verrou (lecture -> fn -> écriture).
 func (s *Store) Update(id string, fn func(*Build)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if b, ok := s.builds[id]; ok {
-		fn(b)
-		b.UpdatedAt = time.Now()
+	b, err := s.get(id)
+	if err != nil {
+		return
 	}
+	fn(b)
+	b.UpdatedAt = time.Now()
+	stepsJSON, _ := json.Marshal(b.Steps)
+	s.db.Exec(
+		`UPDATE builds SET user_id=?, url=?, app_name=?, package=?, mode=?, splash_bg=?, has_icon=?,
+			status=?, error=?, run_id=?, run_url=?, apk_path=?, steps_json=?, progress=?, current_step=?,
+			updated_at=? WHERE id=?`,
+		b.UserID, b.URL, b.AppName, b.Package, b.Mode, b.SplashBg, boolToInt(b.HasIcon),
+		string(b.Status), b.Error, b.RunID, b.RunURL, b.APKPath, string(stepsJSON), b.Progress, b.CurrentStep,
+		b.UpdatedAt.UnixMilli(), id,
+	)
 }
 
 // SetAPKPath enregistre le chemin de l'APK sur disque et passe le build en succès.
 func (s *Store) SetAPKPath(id, path string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if b, ok := s.builds[id]; ok {
+	s.Update(id, func(b *Build) {
 		b.APKPath = path
 		b.Status = StatusSuccess
-		b.UpdatedAt = time.Now()
+	})
+}
+
+// scanner abstrait *sql.Row et *sql.Rows (même méthode Scan).
+type scanner interface {
+	Scan(dest ...any) error
+}
+
+func scanBuild(row scanner) (*Build, error) {
+	var b Build
+	var hasIcon int
+	var stepsJSON string
+	var createdMs, updatedMs int64
+	err := row.Scan(
+		&b.ID, &b.UserID, &b.URL, &b.AppName, &b.Package, &b.Mode, &b.SplashBg, &hasIcon,
+		&b.Status, &b.Error, &b.RunID, &b.RunURL, &b.APKPath, &stepsJSON, &b.Progress, &b.CurrentStep,
+		&createdMs, &updatedMs,
+	)
+	if err != nil {
+		return nil, err
 	}
+	b.HasIcon = hasIcon != 0
+	json.Unmarshal([]byte(stepsJSON), &b.Steps)
+	b.CreatedAt = time.UnixMilli(createdMs)
+	b.UpdatedAt = time.UnixMilli(updatedMs)
+	return &b, nil
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
