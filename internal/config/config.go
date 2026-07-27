@@ -2,6 +2,8 @@ package config
 
 import (
 	"bufio"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -44,6 +46,15 @@ type Config struct {
 	Ref      string // branche sur laquelle lancer le workflow, ex: main
 	Releases string // dossier où sont écrits les APK produits
 	Thumbs   string // dossier où sont écrites les miniatures (screenshots)
+	DB       string // chemin du fichier SQLite (builds + utilisateurs)
+
+	// Connexion Google (optionnelle) : historique de builds privé par compte.
+	// Si GoogleClientID/Secret sont vides, la connexion est simplement désactivée
+	// et l'app fonctionne comme avant (historique local au navigateur, partagé).
+	BaseURL            string // URL publique de l'app, ex: http://localhost:8080 (sert à construire le redirect Google)
+	GoogleClientID     string
+	GoogleClientSecret string
+	SessionSecret      string // signe les cookies de session ; auto-généré si absent (sessions perdues au redémarrage)
 }
 
 // Load lit la configuration depuis les variables d'environnement et valide
@@ -53,14 +64,27 @@ func Load() (*Config, error) {
 	loadDotEnv(".env")
 
 	c := &Config{
-		Port:     env("PORT", "8080"),
-		Token:    os.Getenv("GITHUB_TOKEN"),
-		Owner:    os.Getenv("GITHUB_OWNER"),
-		Repo:     os.Getenv("GITHUB_REPO"),
-		Workflow: env("GITHUB_WORKFLOW", "build-apk.yml"),
-		Ref:      env("GITHUB_REF", "main"),
-		Releases: env("RELEASES_DIR", "releases"),
-		Thumbs:   env("THUMBS_DIR", "thumbs"),
+		Port:               env("PORT", "8080"),
+		Token:              os.Getenv("GITHUB_TOKEN"),
+		Owner:              os.Getenv("GITHUB_OWNER"),
+		Repo:               os.Getenv("GITHUB_REPO"),
+		Workflow:           env("GITHUB_WORKFLOW", "build-apk.yml"),
+		Ref:                env("GITHUB_REF", "main"),
+		Releases:           env("RELEASES_DIR", "releases"),
+		Thumbs:             env("THUMBS_DIR", "thumbs"),
+		DB:                 env("DB_PATH", "data.db"),
+		BaseURL:            strings.TrimRight(env("BASE_URL", "http://localhost:"+env("PORT", "8080")), "/"),
+		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		SessionSecret:      os.Getenv("SESSION_SECRET"),
+	}
+	if c.SessionSecret == "" {
+		// Pas fourni : on en génère un pour cette exécution (les sessions ne
+		// survivront pas à un redémarrage, mais l'appli reste utilisable).
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err == nil {
+			c.SessionSecret = hex.EncodeToString(b)
+		}
 	}
 
 	var missing []string
