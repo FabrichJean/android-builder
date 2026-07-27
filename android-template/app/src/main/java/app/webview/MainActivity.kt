@@ -51,7 +51,11 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.HttpURLConnection
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.net.URL
 import kotlin.math.abs
 
@@ -63,6 +67,7 @@ class MainActivity : Activity() {
     private var pendingDownload: (() -> Unit)? = null
     private val fixImages by lazy { resources.getBoolean(R.bool.fix_images) }
     private val pendingMediaPermission = HashMap<Int, String>()
+    private var mediaServer: LoopbackMediaServer? = null
 
     private companion object {
         const val REQ_STORAGE = 4711
@@ -80,6 +85,14 @@ class MainActivity : Activity() {
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/", WwwPathHandler(assets))
             .build()
+
+        // Médiathèque (musique/vidéo/photo) : servie par un vrai petit serveur HTTP
+        // en boucle locale (127.0.0.1), pas via le domaine virtuel de WebViewAssetLoader.
+        // <audio>/<video> sont souvent décodés par le lecteur média natif d'Android,
+        // qui ouvre sa propre connexion réseau en dehors de la WebView et ne peut
+        // donc pas résoudre "appassets.androidplatform.net" (qui n'existe qu'en
+        // interception WebView) — un vrai socket loopback, si.
+        mediaServer = LoopbackMediaServer(::buildMediaBody).also { it.start() }
 
         // Console de debug optionnelle : widget flottant réductible et déplaçable.
         val debug = resources.getBoolean(R.bool.debug_console)
@@ -110,9 +123,6 @@ class MainActivity : Activity() {
                 ): WebResourceResponse? {
                     val req = request ?: return null
                     val url = req.url
-                    // Servi à part (avec support des requêtes Range) : le PathHandler de
-                    // WebViewAssetLoader n'a pas accès aux en-têtes de la requête.
-                    if (url.path?.startsWith("/media/") == true) return serveMedia(req)
                     assetLoader.shouldInterceptRequest(url)?.let { return it }
                     if (fixImages) proxyImage(req)?.let { return it }
                     return null
@@ -589,7 +599,7 @@ class MainActivity : Activity() {
                     o.put("id", id)
                     o.put("name", c.getString(nameIdx) ?: "")
                     o.put("size", c.getLong(sizeIdx))
-                    o.put("url", "https://appassets.androidplatform.net/media/$type/$id")
+                    o.put("url", "http://127.0.0.1:${mediaServer?.port ?: 0}/media/$type/$id")
                     if (artistIdx >= 0) o.put("artist", c.getString(artistIdx) ?: "")
                     if (durationIdx >= 0) o.put("duration", c.getLong(durationIdx))
                     out.put(o)
@@ -602,14 +612,10 @@ class MainActivity : Activity() {
         return out.toString()
     }
 
-    // Diffuse un fichier de la médiathèque avec support des requêtes "Range" —
-    // requis par <audio>/<video> pour démarrer la lecture (beaucoup de WebView,
-    // dont ceux de Samsung, refusent de lire un média si la réponse à la requête
-    // Range initiale n'est pas un vrai 206 Partial Content avec Content-Length).
-    // On ne peut pas passer par un WebViewAssetLoader.PathHandler ici : son
-    // interface ne donne accès qu'au chemin, jamais aux en-têtes de la requête.
-    private fun serveMedia(request: WebResourceRequest): WebResourceResponse? {
-        val path = request.url.path ?: return null
+    // Construit le corps de réponse d'un fichier de la médiathèque pour le
+    // serveur HTTP local (voir [LoopbackMediaServer]), avec support des
+    // requêtes "Range" (requis par <audio>/<video> pour démarrer la lecture).
+    private fun buildMediaBody(path: String, rangeHeader: String?): MediaBody? {
         val m = Regex("^/media/(audio|video|image)/(\\d+)$").find(path) ?: return null
         val type = m.groupValues[1]
         val id = m.groupValues[2].toLongOrNull() ?: return null
@@ -623,32 +629,18 @@ class MainActivity : Activity() {
             val afd = contentResolver.openAssetFileDescriptor(uri, "r") ?: return null
             val total = afd.length
             val mime = contentResolver.getType(uri) ?: "application/octet-stream"
-            val rangeHeader = request.requestHeaders.entries.firstOrNull { it.key.equals("Range", true) }?.value
             val range = if (rangeHeader != null && total > 0) parseRange(rangeHeader, total) else null
             val stream = afd.createInputStream()
             if (range != null) {
                 val (start, end) = range
                 stream.skip(start)
                 val len = end - start + 1
-                WebResourceResponse(mime, null, BoundedInputStream(stream, len)).apply {
-                    setStatusCodeAndReasonPhrase(206, "Partial Content")
-                    responseHeaders = mapOf(
-                        "Accept-Ranges" to "bytes",
-                        "Content-Range" to "bytes $start-$end/$total",
-                        "Content-Length" to len.toString(),
-                    )
-                }
+                MediaBody(BoundedInputStream(stream, len), mime, len, true, start, end, total)
             } else {
-                WebResourceResponse(mime, null, stream).apply {
-                    setStatusCodeAndReasonPhrase(200, "OK")
-                    responseHeaders = if (total > 0) mapOf(
-                        "Accept-Ranges" to "bytes",
-                        "Content-Length" to total.toString(),
-                    ) else mapOf("Accept-Ranges" to "bytes")
-                }
+                MediaBody(stream, mime, total, false)
             }
         } catch (e: Exception) {
-            android.util.Log.e("MediaBridge", "serveMedia($path) a échoué", e)
+            android.util.Log.e("MediaBridge", "buildMediaBody($path) a échoué", e)
             null
         }
     }
@@ -659,6 +651,11 @@ class MainActivity : Activity() {
         val end = m.groupValues[2].toLongOrNull() ?: (total - 1)
         if (start >= total || start > end) return null
         return start to minOf(end, total - 1)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mediaServer?.close()
     }
 
     // ---- Autres capacités natives (démo) ----
@@ -830,4 +827,77 @@ private class BoundedInputStream(private val src: InputStream, private var remai
         return n
     }
     override fun close() = src.close()
+}
+
+/** Réponse à servir par [LoopbackMediaServer] pour un fichier de la médiathèque. */
+private class MediaBody(
+    val stream: InputStream,
+    val mime: String,
+    val length: Long,
+    val partial: Boolean,
+    val start: Long = 0,
+    val end: Long = 0,
+    val total: Long = 0,
+)
+
+/**
+ * Mini serveur HTTP en boucle locale (127.0.0.1, port aléatoire) qui sert la
+ * médiathèque. Contrairement au domaine virtuel https de WebViewAssetLoader,
+ * un vrai socket loopback est joignable par le lecteur média natif d'Android
+ * (utilisé en coulisse par <audio>/<video>), qui ouvre sa propre connexion
+ * réseau en dehors des hooks de la WebView.
+ */
+private class LoopbackMediaServer(
+    private val serve: (path: String, range: String?) -> MediaBody?,
+) : Thread("media-server") {
+    private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+    val port: Int get() = server.localPort
+
+    override fun run() {
+        while (!server.isClosed) {
+            val socket = try { server.accept() } catch (e: IOException) { return }
+            Thread { handle(socket) }.apply { isDaemon = true }.start()
+        }
+    }
+
+    fun close() { try { server.close() } catch (e: IOException) { /* déjà fermé */ } }
+
+    private fun handle(socket: Socket) {
+        socket.use { s ->
+            s.soTimeout = 15000
+            try {
+                val reader = s.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+                val requestLine = reader.readLine() ?: return
+                val path = requestLine.split(" ").getOrNull(1)?.substringBefore('?') ?: return
+                var range: String? = null
+                while (true) {
+                    val line = reader.readLine() ?: break
+                    if (line.isEmpty()) break
+                    val i = line.indexOf(':')
+                    if (i > 0 && line.take(i).equals("Range", true)) range = line.substring(i + 1).trim()
+                }
+                writeResponse(s.getOutputStream(), serve(path, range))
+            } catch (e: Exception) {
+                // Connexion interrompue par le lecteur (seek, arrêt) : normal.
+            }
+        }
+    }
+
+    private fun writeResponse(out: OutputStream, body: MediaBody?) {
+        if (body == null) {
+            out.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".toByteArray(Charsets.ISO_8859_1))
+            return
+        }
+        val status = if (body.partial) "206 Partial Content" else "200 OK"
+        val headers = buildString {
+            append("HTTP/1.1 $status\r\n")
+            append("Content-Type: ${body.mime}\r\n")
+            append("Content-Length: ${body.length}\r\n")
+            append("Accept-Ranges: bytes\r\n")
+            if (body.partial) append("Content-Range: bytes ${body.start}-${body.end}/${body.total}\r\n")
+            append("Connection: close\r\n\r\n")
+        }
+        out.write(headers.toByteArray(Charsets.ISO_8859_1))
+        body.stream.use { it.copyTo(out) }
+    }
 }
