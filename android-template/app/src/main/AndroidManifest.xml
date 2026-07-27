@@ -24,6 +24,10 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Lecture audio en arrière-plan (option) : service au premier plan. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -43,5 +47,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Garde l'app (et donc l'audio joué dans la WebView) en vie quand
+             l'utilisateur revient à l'accueil ou éteint l'écran (option). -->
+        <service
+            android:name=".BackgroundPlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false" />
     </application>
 </manifest>
