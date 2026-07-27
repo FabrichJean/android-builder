@@ -644,8 +644,50 @@
     $("pkg").placeholder = name ? derivePackage(name) : "app.webview.monapplication";
   });
 
+  // ---- connexion Google (optionnelle) : historique privé par compte ----
+  async function loadServerHistory() {
+    try {
+      const res = await fetch("/api/builds");
+      if (!res.ok) return;
+      const serverBuilds = await res.json();
+      builds = (serverBuilds || []).map(b => ({
+        id: b.id, status: b.status, url: b.url, app_name: b.app_name, mode: b.mode,
+        run_url: b.run_url, error: b.error, progress: b.progress || 0,
+        current_step: b.current_step || "", steps: b.steps || [],
+      }));
+      save(); render();
+      builds.filter(b => !isTerminal(b.status)).forEach(b => subscribe(b.id));
+      pollThumbs(0);
+    } catch { /* API indisponible : on garde l'historique local */ }
+  }
+
+  async function initAccount() {
+    try {
+      const res = await fetch("/api/me");
+      const data = await res.json();
+      if (!data.enabled) return; // connexion Google non configurée : widget masqué
+      $("account").hidden = false;
+      if (data.logged_in) {
+        $("accountLogin").hidden = true;
+        $("accountUser").hidden = false;
+        $("accountName").textContent = data.user.name || data.user.email || "Compte";
+        if (data.user.picture) $("accountAvatar").style.backgroundImage = `url(${data.user.picture})`;
+        await loadServerHistory();
+      } else {
+        $("accountLogin").hidden = false;
+        $("accountUser").hidden = true;
+      }
+    } catch { /* API indisponible : on ignore, l'app reste utilisable sans compte */ }
+  }
+  $("accountLogin").addEventListener("click", () => { location.href = "/auth/google/login"; });
+  $("accountLogout").addEventListener("click", async () => {
+    await fetch("/auth/logout", { method: "POST" });
+    location.reload();
+  });
+
   // Reprise du suivi temps réel au chargement pour les builds non terminés.
   render();
   builds.filter(b => !isTerminal(b.status)).forEach(b => subscribe(b.id));
   pollThumbs(0);
+  initAccount();
 })();

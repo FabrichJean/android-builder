@@ -43,6 +43,34 @@ Copier `.env.example` puis renseigner les variables :
 | `GITHUB_WORKFLOW` | Fichier de workflow                              | `build-apk.yml`|
 | `GITHUB_REF`      | Branche de build                                 | `main`         |
 | `RELEASES_DIR`    | Dossier où sont écrits les APK produits          | `releases`     |
+| `DB_PATH`         | Fichier SQLite (builds + historique par utilisateur) | `data.db`  |
+| `BASE_URL`        | URL publique de l'app (sert au redirect OAuth Google) | `http://localhost:$PORT` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Connexion Google (optionnelle, voir ci-dessous) | — |
+| `SESSION_SECRET`  | Signe les cookies de session (auto-généré si absent) | — |
+
+### Connexion Google (optionnelle) — historique de builds privé
+
+Sans configuration, l'app fonctionne comme avant : chaque navigateur garde son propre
+historique en local (`localStorage`), partagé par tout le monde qui utilise ce
+navigateur. En connectant un compte Google, l'historique des builds est **rattaché
+au compte** et persiste en base (SQLite), accessible depuis n'importe quel navigateur.
+
+Pour l'activer, créer un client OAuth dédié :
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → créer/sélectionner un projet.
+2. **APIs & Services → OAuth consent screen** : configurer l'écran de consentement
+   (type *External* suffit pour un usage personnel/test), scopes par défaut
+   (`openid`, `email`, `profile`) — pas besoin d'ajouter de scope sensible.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**,
+   type **Web application**.
+4. Dans **Authorized redirect URIs**, ajouter exactement
+   `BASE_URL` + `/auth/google/callback` (ex. `http://localhost:8080/auth/google/callback`
+   en local). Cette valeur doit correspondre au caractère près à `BASE_URL` dans `.env`.
+5. Copier le **Client ID** et le **Client Secret** générés dans `.env`
+   (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`).
+
+Tant que l'écran de consentement reste en mode *Testing*, seuls les comptes Google
+ajoutés comme *Test users* (même page) peuvent se connecter.
 
 ## Lancer
 
@@ -210,12 +238,12 @@ En pratique : 1er build ~2-3 min (remplissage des caches), builds suivants ~1 mi
   (secrets GitHub) pour un APK/AAB signé.
 - **Icône** : icône système par défaut. Passer une `icon_url` en input et
   générer les mipmaps dans le workflow pour une icône personnalisée.
-- **Store en mémoire** : les builds sont perdus au redémarrage. Remplacer
-  `internal/buildstore` par Redis/Postgres pour la persistance.
 - **Webhook** au lieu du polling : faire notifier le serveur par le workflow
   (`repository_dispatch` ou endpoint HTTP) en fin de build.
-- **Sécurité** : ajouter une authentification sur l'API avant toute exposition
-  publique (le serveur déclenche des runs GitHub Actions).
+- **Sécurité** : la connexion Google protège l'*historique* (privé par compte),
+  mais pas encore l'API de déclenchement elle-même — n'importe qui connaissant
+  l'URL peut toujours lancer un build. À ajouter avant toute exposition publique
+  large.
 
 ## Structure
 
@@ -223,7 +251,8 @@ En pratique : 1er build ~2-3 min (remplissage des caches), builds suivants ~1 mi
 cmd/server/            point d'entrée
 internal/config/       chargement de la config (env)
 internal/ghclient/     appels API GitHub (dispatch, runs, artifacts)
-internal/buildstore/   store des builds (en mémoire)
+internal/buildstore/   store des builds (SQLite, historique par utilisateur)
+internal/auth/         connexion Google (OAuth2) optionnelle
 internal/server/       API HTTP + orchestration du suivi
 .github/workflows/     build-apk.yml
 android-template/       projet Android WebView (template)
