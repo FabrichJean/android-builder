@@ -70,33 +70,46 @@
               APK Builder — URL ou projet web → APK
             </div>
             <h1>Quelle app on build aujourd'hui ?</h1>
+            <p class="subtitle">Transforme une URL ou un projet web en APK Android, en quelques clics.</p>
 
             <div class="card">
-              <form id="form" novalidate class="promptbar">
-                <!-- entrée unifiée : URL ou glisser-déposer -->
-                <div class="uni" id="dropZone">
-                  <input id="url" type="url" class="uni-input" placeholder="https://exemple.com — ou glisse-dépose un dossier / .zip…" />
-                  <div class="uni-actions">
-                    <button type="button" class="uni-btn uni-import" id="importBtn" title="Importer un projet web"
-                            aria-haspopup="true" aria-expanded="false">
-                      <svg class="ic" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
-                      Importer
-                      <svg class="ic uni-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="import-menu" id="importMenu" hidden>
-                      <button type="button" class="import-opt" id="pickDir">
-                        <svg class="ic import-opt-ic" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
-                        Dossier<small>Sélectionne le dossier <code>dist/</code></small>
+              <form id="form" novalidate>
+                <!-- entrée unifiée : URL ou glisser-déposer, façon barre de prompt -->
+                <div class="prompt-box" id="dropZone">
+                  <textarea id="url" class="prompt-input" rows="1" placeholder="https://exemple.com — ou glisse-dépose un dossier / .zip…"></textarea>
+                  <div class="prompt-toolbar">
+                    <div class="pt-left">
+                      <button type="button" class="pt-import" id="importBtn" title="Importer un projet web"
+                              aria-haspopup="true" aria-expanded="false">
+                        <svg class="ic" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+                        Importer
+                        <svg class="ic uni-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
                       </button>
-                      <button type="button" class="import-opt" id="pickZip">
-                        <svg class="ic import-opt-ic" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v2M12 7v2M12 11v2M10 13h4a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-4z"/></svg>
-                        Fichier .zip<small>Un .zip contenant <code>index.html</code></small>
+                      <div class="import-menu" id="importMenu" hidden>
+                        <button type="button" class="import-opt" id="pickDir">
+                          <svg class="ic import-opt-ic" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+                          Dossier<small>Sélectionne le dossier <code>dist/</code></small>
+                        </button>
+                        <button type="button" class="import-opt" id="pickZip">
+                          <svg class="ic import-opt-ic" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v2M12 7v2M12 11v2M10 13h4a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-4z"/></svg>
+                          Fichier .zip<small>Un .zip contenant <code>index.html</code></small>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="pt-right">
+                      <span class="pt-hint">
+                        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+                        ~30s après le build
+                      </span>
+                      <button type="submit" class="pt-submit" id="submit" title="Générer l'APK">
+                        <svg class="ic" viewBox="0 0 24 24"><path d="M12 19V6"/><path d="M6 12l6-7 6 7"/></svg>
                       </button>
                     </div>
                   </div>
                   <input id="distDir" type="file" webkitdirectory hidden />
                   <input id="dist" type="file" accept=".zip,application/zip" hidden />
                 </div>
+                <div class="form-error" id="formError"></div>
 
                 <!-- résumé de la source importée -->
                 <div class="section" id="summarySection" hidden>
