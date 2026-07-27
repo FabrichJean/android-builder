@@ -77,9 +77,11 @@
     const grid = panel.querySelector(".grid");
     if (!items.length) { grid.innerHTML = `<div class="empty">Aucun fichier trouvé.</div>`; return; }
     if (type === "video") {
+      // Pas de <video> ici : décoder une image pour chaque miniature épuise vite
+      // les décodeurs matériels (limités en nombre) et finit par planter l'app.
+      // Le vrai <video> n'est créé qu'à la lecture, dans la lightbox.
       grid.innerHTML = items.map((it) => `
-        <div class="thumb" data-url="${esc(it.url)}" data-kind="video">
-          <video src="${esc(it.url)}#t=0.5" preload="metadata" muted></video>
+        <div class="thumb video-placeholder" data-url="${esc(it.url)}" data-kind="video">
           <div class="play"><svg class="ic" viewBox="0 0 24 24"><path d="M8 5l12 7-12 7z"/></svg></div>
           <div class="name">${esc(it.name)}</div>
         </div>`).join("");
