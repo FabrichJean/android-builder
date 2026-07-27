@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.DownloadManager
-import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Intent
@@ -51,6 +50,7 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.abs
@@ -79,7 +79,6 @@ class MainActivity : Activity() {
         // Sert le dist embarqué (assets/www) sur https://appassets.androidplatform.net/
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/", WwwPathHandler(assets))
-            .addPathHandler("/media/", MediaPathHandler(contentResolver))
             .build()
 
         // Console de debug optionnelle : widget flottant réductible et déplaçable.
@@ -109,9 +108,13 @@ class MainActivity : Activity() {
                     view: WebView?,
                     request: WebResourceRequest?,
                 ): WebResourceResponse? {
-                    val url = request?.url ?: return null
+                    val req = request ?: return null
+                    val url = req.url
+                    // Servi à part (avec support des requêtes Range) : le PathHandler de
+                    // WebViewAssetLoader n'a pas accès aux en-têtes de la requête.
+                    if (url.path?.startsWith("/media/") == true) return serveMedia(req)
                     assetLoader.shouldInterceptRequest(url)?.let { return it }
-                    if (fixImages) proxyImage(request)?.let { return it }
+                    if (fixImages) proxyImage(req)?.let { return it }
                     return null
                 }
 
@@ -545,7 +548,7 @@ class MainActivity : Activity() {
     }
 
     // Interroge le MediaStore et renvoie un JSON avec l'URL de streaming (servie
-    // par MediaPathHandler via le domaine virtuel https de la WebView).
+    // par serveMedia() via le domaine virtuel https de la WebView).
     fun listMedia(type: String): String {
         if (!hasMediaPermission(type)) return "[]"
         val (uri, nameCol, extraCols) = when (type) {
@@ -597,6 +600,65 @@ class MainActivity : Activity() {
             return "[]"
         }
         return out.toString()
+    }
+
+    // Diffuse un fichier de la médiathèque avec support des requêtes "Range" —
+    // requis par <audio>/<video> pour démarrer la lecture (beaucoup de WebView,
+    // dont ceux de Samsung, refusent de lire un média si la réponse à la requête
+    // Range initiale n'est pas un vrai 206 Partial Content avec Content-Length).
+    // On ne peut pas passer par un WebViewAssetLoader.PathHandler ici : son
+    // interface ne donne accès qu'au chemin, jamais aux en-têtes de la requête.
+    private fun serveMedia(request: WebResourceRequest): WebResourceResponse? {
+        val path = request.url.path ?: return null
+        val m = Regex("^/media/(audio|video|image)/(\\d+)$").find(path) ?: return null
+        val type = m.groupValues[1]
+        val id = m.groupValues[2].toLongOrNull() ?: return null
+        val base = when (type) {
+            "audio" -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            "video" -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            else -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+        val uri = ContentUris.withAppendedId(base, id)
+        return try {
+            val afd = contentResolver.openAssetFileDescriptor(uri, "r") ?: return null
+            val total = afd.length
+            val mime = contentResolver.getType(uri) ?: "application/octet-stream"
+            val rangeHeader = request.requestHeaders.entries.firstOrNull { it.key.equals("Range", true) }?.value
+            val range = if (rangeHeader != null && total > 0) parseRange(rangeHeader, total) else null
+            val stream = afd.createInputStream()
+            if (range != null) {
+                val (start, end) = range
+                stream.skip(start)
+                val len = end - start + 1
+                WebResourceResponse(mime, null, BoundedInputStream(stream, len)).apply {
+                    setStatusCodeAndReasonPhrase(206, "Partial Content")
+                    responseHeaders = mapOf(
+                        "Accept-Ranges" to "bytes",
+                        "Content-Range" to "bytes $start-$end/$total",
+                        "Content-Length" to len.toString(),
+                    )
+                }
+            } else {
+                WebResourceResponse(mime, null, stream).apply {
+                    setStatusCodeAndReasonPhrase(200, "OK")
+                    responseHeaders = if (total > 0) mapOf(
+                        "Accept-Ranges" to "bytes",
+                        "Content-Length" to total.toString(),
+                    ) else mapOf("Accept-Ranges" to "bytes")
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MediaBridge", "serveMedia($path) a échoué", e)
+            null
+        }
+    }
+
+    private fun parseRange(header: String, total: Long): Pair<Long, Long>? {
+        val m = Regex("""bytes=(\d*)-(\d*)""").find(header) ?: return null
+        val start = m.groupValues[1].toLongOrNull() ?: 0L
+        val end = m.groupValues[2].toLongOrNull() ?: (total - 1)
+        if (start >= total || start > end) return null
+        return start to minOf(end, total - 1)
     }
 
     // ---- Autres capacités natives (démo) ----
@@ -751,32 +813,21 @@ private class WwwPathHandler(
 }
 
 /**
- * Diffuse un élément de la médiathèque (musique/vidéo/photo) via le domaine
- * virtuel https de la WebView. Chemin attendu : "<type>/<id>" (ex. "audio/123"),
- * tel que renvoyé par [MainActivity.listMedia] dans le champ `url`.
+ * Limite un InputStream à `limit` octets (pour servir une tranche "Range" d'un
+ * fichier sans lire au-delà de ce qui a été annoncé en Content-Length).
  */
-private class MediaPathHandler(
-    private val resolver: ContentResolver,
-) : WebViewAssetLoader.PathHandler {
-    override fun handle(path: String): WebResourceResponse? {
-        val clean = Uri.decode(path).trim('/')
-        val parts = clean.split('/', limit = 2)
-        if (parts.size != 2) return null
-        val type = parts[0]
-        val id = parts[1].toLongOrNull() ?: return null
-        val base = when (type) {
-            "audio" -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-            "video" -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            "image" -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            else -> return null
-        }
-        val uri = ContentUris.withAppendedId(base, id)
-        return try {
-            val stream = resolver.openInputStream(uri) ?: return null
-            val mime = resolver.getType(uri) ?: "application/octet-stream"
-            WebResourceResponse(mime, null, stream)
-        } catch (e: Exception) {
-            null
-        }
+private class BoundedInputStream(private val src: InputStream, private var remaining: Long) : InputStream() {
+    override fun read(): Int {
+        if (remaining <= 0) return -1
+        val b = src.read()
+        if (b >= 0) remaining--
+        return b
     }
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        if (remaining <= 0) return -1
+        val n = src.read(b, off, minOf(len.toLong(), remaining).toInt())
+        if (n > 0) remaining -= n
+        return n
+    }
+    override fun close() = src.close()
 }
