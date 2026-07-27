@@ -69,15 +69,16 @@ func (s *Server) Routes() http.Handler {
 }
 
 type createRequest struct {
-	URL           string `json:"url"`
-	AppName       string `json:"app_name"`
-	Package       string `json:"package"`
-	VersionName   string `json:"version_name"`
-	VersionCode   string `json:"version_code"`
-	SplashBg      string `json:"splash_bg"`
-	HideScrollbar bool   `json:"hide_scrollbar"`
-	DebugConsole  bool   `json:"debug_console"`
-	FixImages     bool   `json:"fix_images"`
+	URL              string `json:"url"`
+	AppName          string `json:"app_name"`
+	Package          string `json:"package"`
+	VersionName      string `json:"version_name"`
+	VersionCode      string `json:"version_code"`
+	SplashBg         string `json:"splash_bg"`
+	HideScrollbar    bool   `json:"hide_scrollbar"`
+	DebugConsole     bool   `json:"debug_console"`
+	FixImages        bool   `json:"fix_images"`
+	BackgroundPlayer bool   `json:"background_player"`
 }
 
 var (
@@ -197,18 +198,19 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inputs := map[string]string{
-		"build_id":       id,
-		"app_url":        req.URL,
-		"app_name":       req.AppName,
-		"package_id":     req.Package,
-		"version_name":   req.VersionName,
-		"version_code":   req.VersionCode,
-		"bundle":         "false",
-		"has_icon":       "false",
-		"splash_bg":      splashBg,
-		"hide_scrollbar": boolStr(req.HideScrollbar),
-		"debug_console":  boolStr(req.DebugConsole),
-		"fix_images":     boolStr(req.FixImages),
+		"build_id":          id,
+		"app_url":           req.URL,
+		"app_name":          req.AppName,
+		"package_id":        req.Package,
+		"version_name":      req.VersionName,
+		"version_code":      req.VersionCode,
+		"bundle":            "false",
+		"has_icon":          "false",
+		"splash_bg":         splashBg,
+		"hide_scrollbar":    boolStr(req.HideScrollbar),
+		"debug_console":     boolStr(req.DebugConsole),
+		"fix_images":        boolStr(req.FixImages),
+		"background_player": boolStr(req.BackgroundPlayer),
 	}
 
 	// Heure du dispatch : sert à ne chercher que les runs créés ensuite.
@@ -250,6 +252,7 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	hideScrollbar := r.FormValue("hide_scrollbar") == "true"
 	debugConsole := r.FormValue("debug_console") == "true"
 	fixImages := r.FormValue("fix_images") == "true"
+	backgroundPlayer := r.FormValue("background_player") == "true"
 
 	if appName == "" {
 		writeErr(w, http.StatusBadRequest, "app_name est obligatoire")
@@ -384,18 +387,19 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inputs := map[string]string{
-		"build_id":       id,
-		"app_url":        appAssetURL,
-		"app_name":       appName,
-		"package_id":     pkg,
-		"version_name":   vname,
-		"version_code":   vcode,
-		"bundle":         boolStr(bundle),
-		"has_icon":       boolStr(iconData != nil),
-		"splash_bg":      splashBg,
-		"hide_scrollbar": boolStr(hideScrollbar),
-		"debug_console":  boolStr(debugConsole),
-		"fix_images":     boolStr(fixImages),
+		"build_id":          id,
+		"app_url":           appAssetURL,
+		"app_name":          appName,
+		"package_id":        pkg,
+		"version_name":      vname,
+		"version_code":      vcode,
+		"bundle":            boolStr(bundle),
+		"has_icon":          boolStr(iconData != nil),
+		"splash_bg":         splashBg,
+		"hide_scrollbar":    boolStr(hideScrollbar),
+		"debug_console":     boolStr(debugConsole),
+		"fix_images":        boolStr(fixImages),
+		"background_player": boolStr(backgroundPlayer),
 	}
 
 	dispatchedAt := time.Now()
