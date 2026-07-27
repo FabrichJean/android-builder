@@ -14,11 +14,21 @@
         Se connecter avec Google
       </button>
       <div class="account-user" id="accountUser" hidden>
-        <span class="account-avatar" id="accountAvatar"></span>
-        <span class="account-name" id="accountName"></span>
-        <button type="button" class="account-logout" id="accountLogout" title="Se déconnecter">
-          <svg class="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <button type="button" class="account-chip" id="accountTrigger" aria-haspopup="true" aria-expanded="false">
+          <span class="account-avatar" id="accountAvatar">
+            <img id="accountAvatarImg" alt="" hidden />
+            <span id="accountAvatarInitial"></span>
+          </span>
+          <span class="account-name" id="accountName"></span>
+          <span class="account-badge">Connecté</span>
+          <svg class="ic account-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
         </button>
+        <div class="account-menu" id="accountMenu" hidden>
+          <button type="button" class="account-menu-item" id="accountLogout">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+            Se déconnecter
+          </button>
+        </div>
       </div>
     </div>
     <div class="hero-inner">

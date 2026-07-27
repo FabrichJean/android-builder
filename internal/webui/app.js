@@ -661,6 +661,21 @@
     } catch { /* API indisponible : on garde l'historique local */ }
   }
 
+  // Affiche la vraie photo de profil Google ; repli sur l'initiale du nom/email
+  // si aucune photo n'est fournie ou si son chargement échoue.
+  function setAvatar(user) {
+    const img = $("accountAvatarImg"), initial = $("accountAvatarInitial");
+    initial.textContent = ((user.name || user.email || "?").trim()[0] || "?").toUpperCase();
+    if (user.picture) {
+      img.hidden = false;
+      img.onerror = () => { img.hidden = true; };
+      img.src = user.picture;
+    } else {
+      img.hidden = true;
+      img.removeAttribute("src");
+    }
+  }
+
   async function initAccount() {
     try {
       const res = await fetch("/api/me");
@@ -671,7 +686,7 @@
         $("accountLogin").hidden = true;
         $("accountUser").hidden = false;
         $("accountName").textContent = data.user.name || data.user.email || "Compte";
-        if (data.user.picture) $("accountAvatar").style.backgroundImage = `url(${data.user.picture})`;
+        setAvatar(data.user);
         await loadServerHistory();
       } else {
         $("accountLogin").hidden = false;
@@ -680,6 +695,19 @@
     } catch { /* API indisponible : on ignore, l'app reste utilisable sans compte */ }
   }
   $("accountLogin").addEventListener("click", () => { location.href = "/auth/google/login"; });
+
+  // Puce compte : menu déroulant (déconnexion), fermeture au clic extérieur.
+  const accountTrigger = $("accountTrigger"), accountMenu = $("accountMenu");
+  function closeAccountMenu() { accountMenu.hidden = true; accountTrigger.setAttribute("aria-expanded", "false"); }
+  accountTrigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = accountTrigger.getAttribute("aria-expanded") === "true";
+    accountMenu.hidden = open;
+    accountTrigger.setAttribute("aria-expanded", String(!open));
+  });
+  document.addEventListener("click", (e) => {
+    if (!accountMenu.hidden && !accountMenu.contains(e.target) && e.target !== accountTrigger) closeAccountMenu();
+  });
   $("accountLogout").addEventListener("click", async () => {
     await fetch("/auth/logout", { method: "POST" });
     location.reload();

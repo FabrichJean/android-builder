@@ -54,7 +54,8 @@
   .hero-inner { max-width: 680px; margin: 0 auto; }
 
   /* ---- connexion Google (optionnelle) ---- */
-  .account { position: absolute; top: 20px; right: 20px; z-index: 5; }
+  .account { position: absolute; top: 20px; right: 20px; z-index: 6; }
+  .account[hidden], .account-login[hidden], .account-user[hidden], .account-menu[hidden] { display: none; }
   .account-login {
     display: inline-flex; align-items: center; gap: 9px;
     background: #16130c; border: 1px solid var(--border-2); color: var(--text);
@@ -64,27 +65,60 @@
   }
   .account-login:hover { border-color: var(--sand); }
   .account-login .ic { width: 16px; height: 16px; }
-  .account-user {
-    display: flex; align-items: center; gap: 8px;
-    background: #16130c; border: 1px solid var(--border-2);
-    padding: 6px 8px 6px 6px; border-radius: 999px; box-shadow: var(--shadow);
+
+  .account-user { position: relative; }
+  .account-chip {
+    display: flex; align-items: center; gap: 10px; min-width: 200px;
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border-2); color: var(--text);
+    font-family: inherit; cursor: pointer;
+    padding: 7px 12px 7px 7px; border-radius: 12px; box-shadow: var(--shadow);
+    transition: border-color .15s, background .15s;
   }
+  .account-chip:hover { border-color: var(--sand); background: var(--surface-2); }
+  .account-chip[aria-expanded="true"] .account-chev { transform: rotate(180deg); }
+
   .account-avatar {
-    width: 28px; height: 28px; border-radius: 50%; flex: none;
-    background: linear-gradient(160deg, var(--sand), var(--sand-dim)) center/cover;
+    position: relative; width: 30px; height: 30px; border-radius: 9px; flex: none;
+    display: grid; place-items: center; overflow: hidden;
+    background: linear-gradient(160deg, var(--sand), var(--sand-dim));
     box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
   }
+  .account-avatar img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  }
+  .account-avatar img[hidden] { display: none; }
+  #accountAvatarInitial {
+    font-size: 13px; font-weight: 700; color: #201a0e; line-height: 1;
+  }
+
+  /* flex:1 sur le nom -> pousse badge + chevron à droite du chip, comme la
+     référence (avatar+nom à gauche, badge+chevron alignés à droite). */
   .account-name {
-    font-size: 12.5px; font-weight: 600; color: var(--text); max-width: 140px;
+    flex: 1; min-width: 0;
+    font-size: 13px; font-weight: 650; color: var(--text);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .account-logout {
-    display: grid; place-items: center; width: 26px; height: 26px;
-    border-radius: 50%; border: none; background: transparent; color: var(--muted);
-    cursor: pointer;
+  .account-badge {
+    display: inline-flex; align-items: center; flex: none;
+    font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+    color: var(--sand); background: var(--sand-soft); border: 1px solid var(--sand-dim);
+    padding: 2px 8px; border-radius: 999px; line-height: 1.5;
   }
-  .account-logout:hover { color: var(--err); background: rgba(221,139,120,0.12); }
-  .account-logout .ic { width: 14px; height: 14px; }
+  .account-chev { color: var(--faint); transition: transform .2s; flex: none; }
+
+  .account-menu {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 7; width: 190px;
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border-2); border-radius: 12px; padding: 6px;
+    box-shadow: var(--shadow); animation: pop .16s ease;
+  }
+  .account-menu-item {
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+    background: none; border: none; border-radius: 8px; padding: 9px 10px; cursor: pointer;
+    color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600;
+  }
+  .account-menu-item:hover { background: rgba(221,139,120,0.12); color: var(--err); }
   .pill-badge {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: 12.5px; font-weight: 600; color: var(--sand);
