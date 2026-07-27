@@ -335,36 +335,6 @@
   .pb-fields.drag { outline: 2px dashed var(--sand); outline-offset: 8px; border-radius: 8px; }
 
   /* ---- maquette : entrée unifiée + sections ---- */
-  .uni {
-    position: relative; display: flex; align-items: center;
-    background: #100d08; border: 1px solid var(--sand-dim); border-radius: 14px;
-    padding: 3px 6px 3px 16px;
-    box-shadow: 0 0 0 3px var(--sand-soft), 0 0 34px -8px rgba(224,192,125,0.28);
-    transition: box-shadow .2s, border-color .2s;
-  }
-  .uni:focus-within, .uni.drag {
-    border-color: var(--sand);
-    box-shadow: 0 0 0 3px rgba(224,192,125,0.24), 0 0 44px -6px rgba(224,192,125,0.42);
-  }
-  .uni-input { flex: 1; border: none; background: none; box-shadow: none !important; padding: 14px 0; font-size: 16px; }
-  .uni.has-project .uni-input { opacity: .4; }
-  .uni-actions { position: relative; display: flex; gap: 4px; flex: none; }
-  .uni-btn {
-    width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border);
-    background: transparent; color: var(--muted); cursor: pointer; font-size: 17px;
-    transition: color .15s, border-color .15s, background .15s;
-  }
-  .uni-btn:hover { color: var(--sand); border-color: var(--border-2); background: var(--sand-soft); }
-  /* bouton unique "Importer" + menu déroulant */
-  .uni-import {
-    width: auto; height: auto; display: inline-flex; align-items: center; gap: 7px;
-    padding: 10px 14px; font-size: 14px; font-weight: 600; font-family: inherit;
-    color: var(--sand); border-color: var(--sand-dim); background: var(--sand-soft);
-    white-space: nowrap;
-  }
-  .uni-import:hover { color: var(--sand); border-color: var(--sand); background: rgba(224,192,125,0.18); }
-  .uni-import .uni-chev { font-size: 10px; opacity: .8; transition: transform .2s; }
-  .uni-import[aria-expanded="true"] .uni-chev { transform: rotate(180deg); }
   .import-menu {
     position: absolute; top: calc(100% + 8px); right: 0; z-index: 26; width: 230px;
     background: linear-gradient(180deg, var(--surface), var(--surface-2));
