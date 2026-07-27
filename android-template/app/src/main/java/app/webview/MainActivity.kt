@@ -1,39 +1,16 @@
 package app.webview
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.DownloadManager
-import android.content.ContentUris
-import android.content.ContentValues
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.AssetManager
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.net.Uri
-import android.os.Build
-import android.os.BatteryManager
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.provider.MediaStore
-import android.text.method.ScrollingMovementMethod
-import android.util.Base64
 import android.view.Gravity
 import android.view.KeyEvent
-import android.view.MotionEvent
-import android.view.View
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
-import android.webkit.CookieManager
-import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
-import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -42,65 +19,38 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import androidx.webkit.WebViewAssetLoader
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.ByteArrayInputStream
-import java.io.File
-import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
-import java.net.HttpURLConnection
-import java.net.InetAddress
-import java.net.ServerSocket
-import java.net.Socket
-import java.net.URL
-import java.util.concurrent.Executors
-import kotlin.math.abs
 
 class MainActivity : Activity() {
 
-    private lateinit var webView: WebView
+    internal lateinit var webView: WebView
     private var splash: ViewGroup? = null
     private var splashHidden = false
-    private var pendingDownload: (() -> Unit)? = null
     private val fixImages by lazy { resources.getBoolean(R.bool.fix_images) }
-    private val pendingMediaPermission = HashMap<Int, String>()
-    private var mediaServer: LoopbackMediaServer? = null
-    private var pendingWebRequest: PermissionRequest? = null
 
-    private companion object {
-        const val REQ_STORAGE = 4711
-        const val REQ_MEDIA_AUDIO = 4801
-        const val REQ_MEDIA_VIDEO = 4802
-        const val REQ_MEDIA_IMAGE = 4803
-        const val REQ_WEBRTC = 4901
-        const val MAX_IMAGE_BYTES = 25 * 1024 * 1024
-    }
+    private lateinit var downloads: Downloads
+    private lateinit var mediaLibrary: MediaLibrary
+    private lateinit var webRtc: WebRtcPermissions
+    private lateinit var deviceCapabilities: DeviceCapabilities
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        downloads = Downloads(this)
+        mediaLibrary = MediaLibrary(this)
+        webRtc = WebRtcPermissions(this)
+        deviceCapabilities = DeviceCapabilities(this)
 
         // Sert le dist embarqué (assets/www) sur https://appassets.androidplatform.net/
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/", WwwPathHandler(assets))
             .build()
 
-        // Médiathèque (musique/vidéo/photo) : servie par un vrai petit serveur HTTP
-        // en boucle locale (127.0.0.1), pas via le domaine virtuel de WebViewAssetLoader.
-        // <audio>/<video> sont souvent décodés par le lecteur média natif d'Android,
-        // qui ouvre sa propre connexion réseau en dehors de la WebView et ne peut
-        // donc pas résoudre "appassets.androidplatform.net" (qui n'existe qu'en
-        // interception WebView) — un vrai socket loopback, si.
-        mediaServer = LoopbackMediaServer(::buildMediaBody).also { it.start() }
-
         // Console de debug optionnelle : widget flottant réductible et déplaçable.
         val debug = resources.getBoolean(R.bool.debug_console)
-        val console = if (debug) DebugConsole() else null
+        val console = if (debug) DebugConsole(this) else null
 
         webView = WebView(this).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -128,38 +78,25 @@ class MainActivity : Activity() {
                     val req = request ?: return null
                     val url = req.url
                     assetLoader.shouldInterceptRequest(url)?.let { return it }
-                    if (fixImages) proxyImage(req)?.let { return it }
+                    if (fixImages) ImageProxy.intercept(req)?.let { return it }
                     return null
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     if (console != null) {
                         // Capture les erreurs non gérées et rejets de promesses (fetch).
-                        view?.evaluateJavascript(
-                            """(function(){if(window.__dbg)return;window.__dbg=1;
-                               window.addEventListener('error',function(e){
-                                 var t=e.target||e.srcElement;
-                                 if(t&&(t.tagName==='IMG'||t.tagName==='SCRIPT'||t.tagName==='LINK')){
-                                   var u=t.currentSrc||t.src||t.href;
-                                   console.error('RES fail ['+t.tagName+']: '+u);
-                                   try{fetch(u).then(function(r){console.error('  -> HTTP '+r.status+' ct='+r.headers.get('content-type'));return r.arrayBuffer();}).then(function(buf){var a=new Uint8Array(buf).subarray(0,4);var hex=[].map.call(a,function(x){return ('0'+x.toString(16)).slice(-2);}).join('');var kind=(hex.slice(0,4)==='ffd8')?'JPEG ok':(hex.slice(0,8)==='89504e47')?'PNG ok':(hex.slice(0,6)==='474946')?'GIF ok':'PAS une image (chiffre?)';console.error('  -> '+buf.byteLength+'o magic='+hex+' '+kind);}).catch(function(err){console.error('  -> fetch err: '+err);});}catch(_){}
-                                 } else { console.error('JS: '+e.message+' @'+e.filename+':'+e.lineno); }
-                               },true);
-                               window.addEventListener('unhandledrejection',function(e){var r=e.reason;console.error('Promise: '+((r&&(r.stack||r.message))||r));});
-                            })();""",
-                            null,
-                        )
+                        view?.evaluateJavascript(DEBUG_CAPTURE_JS, null)
                     }
                     Handler(Looper.getMainLooper()).postDelayed({ hideSplash() }, 500)
                 }
             }
             // Téléchargements déclenchés par la page -> dossier Téléchargements.
             setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
-                startDownload(url, userAgent, contentDisposition, mimetype)
+                downloads.start(url, userAgent, contentDisposition, mimetype)
             }
-            addJavascriptInterface(DownloadBridge(this@MainActivity), "AndroidDownload")
-            addJavascriptInterface(MediaBridge(this@MainActivity), "AndroidMedia")
-            addJavascriptInterface(DeviceBridge(this@MainActivity), "AndroidDevice")
+            addJavascriptInterface(DownloadBridge(downloads, this@MainActivity), "AndroidDownload")
+            addJavascriptInterface(MediaBridge(mediaLibrary), "AndroidMedia")
+            addJavascriptInterface(DeviceBridge(deviceCapabilities), "AndroidDevice")
 
             val dbg = console
             webChromeClient = object : WebChromeClient() {
@@ -173,7 +110,7 @@ class MainActivity : Activity() {
                 // "ressources" web ; on les relaie vers les permissions Android
                 // runtime correspondantes puis on accorde/refuse en conséquence.
                 override fun onPermissionRequest(request: PermissionRequest) {
-                    handleWebPermissionRequest(request)
+                    webRtc.handle(request)
                 }
             }
         }
@@ -219,542 +156,19 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    /** Console de debug flottante : panneau réductible en une bulle déplaçable. */
-    private inner class DebugConsole {
-        private val log = TextView(this@MainActivity).apply {
-            setTextColor(Color.parseColor("#9be29b"))
-            typeface = Typeface.MONOSPACE
-            textSize = 10f
-            setPadding(dp(12), dp(8), dp(12), dp(12))
-            movementMethod = ScrollingMovementMethod()
-            setTextIsSelectable(true)
-            text = "— console de debug —\n"
-        }
-        private val panel = LinearLayout(this@MainActivity).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xE6000000.toInt())
-            visibility = View.GONE
-            addView(buildHeader())
-            addView(log, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-        }
-        private val bubble = TextView(this@MainActivity).apply {
-            text = "🐞"
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = pill(0xCC1B1B1B.toInt())
-        }
-
-        private fun buildHeader(): View {
-            val header = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setBackgroundColor(0xFF141414.toInt())
-                setPadding(dp(12), dp(4), dp(6), dp(4))
-            }
-            val title = TextView(this@MainActivity).apply {
-                text = "🐞 console"
-                setTextColor(Color.parseColor("#e0c07d"))
-                textSize = 12f
-            }
-            header.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            header.addView(headerBtn("Vider") { log.text = "" })
-            header.addView(headerBtn("▁ réduire") { collapse() })
-            return header
-        }
-
-        private fun headerBtn(label: String, onClick: () -> Unit) = TextView(this@MainActivity).apply {
-            text = label
-            setTextColor(Color.parseColor("#ece3d0"))
-            textSize = 12f
-            setPadding(dp(10), dp(6), dp(10), dp(6))
-            setOnClickListener { onClick() }
-        }
-
-        fun addTo(root: FrameLayout) {
-            root.addView(
-                panel,
-                FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    (resources.displayMetrics.heightPixels * 0.34f).toInt(),
-                    Gravity.BOTTOM,
-                ),
-            )
-            root.addView(
-                bubble,
-                FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT),
-            )
-            bubble.post {
-                val p = bubble.parent as View
-                bubble.x = (p.width - bubble.width - dp(12)).toFloat()
-                bubble.y = (p.height - bubble.height - dp(96)).toFloat()
-            }
-            wireDrag()
-        }
-
-        private fun wireDrag() {
-            var downX = 0f
-            var downY = 0f
-            var startX = 0f
-            var startY = 0f
-            var moved = false
-            val slop = dp(8).toFloat()
-            bubble.setOnTouchListener { v, e ->
-                when (e.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        downX = e.rawX; downY = e.rawY; startX = v.x; startY = v.y; moved = false; true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        val dx = e.rawX - downX
-                        val dy = e.rawY - downY
-                        if (abs(dx) > slop || abs(dy) > slop) moved = true
-                        val p = v.parent as View
-                        v.x = (startX + dx).coerceIn(0f, (p.width - v.width).toFloat())
-                        v.y = (startY + dy).coerceIn(0f, (p.height - v.height).toFloat())
-                        true
-                    }
-                    MotionEvent.ACTION_UP -> { if (!moved) { v.performClick(); expand() }; true }
-                    else -> false
-                }
-            }
-        }
-
-        private fun expand() {
-            panel.visibility = View.VISIBLE
-            bubble.visibility = View.GONE
-        }
-
-        private fun collapse() {
-            panel.visibility = View.GONE
-            bubble.visibility = View.VISIBLE
-            bubble.background = pill(0xCC1B1B1B.toInt())
-        }
-
-        fun append(line: String) = runOnUiThread {
-            log.append(line + "\n")
-            val s = log.text
-            if (s.length > 12000) log.text = s.subSequence(s.length - 8000, s.length)
-            log.post {
-                val l = log.layout ?: return@post
-                val amount = l.getLineTop(log.lineCount) - log.height + log.paddingTop + log.paddingBottom
-                log.scrollTo(0, if (amount > 0) amount else 0)
-            }
-            // Signale visuellement un nouveau message quand la console est réduite.
-            if (panel.visibility != View.VISIBLE) bubble.background = pill(0xCCC85A4A.toInt())
-        }
-
-        private fun pill(color: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(16).toFloat() }
-        private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
-    }
-
-    // ---- Correction des images (proxy natif) ----
-    // Récupère l'image en natif et la renvoie avec le bon Content-Type. Corrige
-    // les serveurs qui renvoient application/octet-stream (ex. fichiers .enc) et
-    // contourne les blocages CORS des <img crossorigin>.
-    private fun proxyImage(request: WebResourceRequest): WebResourceResponse? {
-        if (!request.method.equals("GET", true)) return null
-        val headers = request.requestHeaders
-        val accept = headers.entries.firstOrNull { it.key.equals("Accept", true) }?.value ?: ""
-        if (!accept.contains("image/")) return null // seulement les requêtes d'image
-        if (headers.keys.any { it.equals("Range", true) }) return null // pas de streaming
-        val urlStr = request.url.toString()
-        if (!urlStr.startsWith("http")) return null
-
-        var conn: HttpURLConnection? = null
-        return try {
-            val c = URL(urlStr).openConnection() as HttpURLConnection
-            conn = c
-            c.requestMethod = "GET"
-            c.connectTimeout = 15000
-            c.readTimeout = 20000
-            c.instanceFollowRedirects = true
-            CookieManager.getInstance().getCookie(urlStr)?.let { c.setRequestProperty("Cookie", it) }
-            // On ne transmet pas Accept-Encoding/Range/Host : laisser HttpURLConnection
-            // gérer la compression (sinon octets gzip non décompressés -> image cassée).
-            val skip = setOf("accept-encoding", "range", "host", "connection", "content-length")
-            headers.forEach { (k, v) -> if (k.lowercase() !in skip) c.setRequestProperty(k, v) }
-
-            if (c.responseCode !in 200..299) return null
-            val serverCt = c.contentType
-            val bytes = c.inputStream.use { it.readBytes() }
-            if (bytes.size > MAX_IMAGE_BYTES) return null
-            val mime = imageMime(urlStr, serverCt, bytes) ?: return null
-            WebResourceResponse(mime, null, ByteArrayInputStream(bytes)).apply {
-                setStatusCodeAndReasonPhrase(200, "OK")
-                responseHeaders = mapOf(
-                    "Access-Control-Allow-Origin" to "*",
-                    "Cache-Control" to "public, max-age=3600",
-                )
-            }
-        } catch (e: Exception) {
-            null
-        } finally {
-            conn?.disconnect()
-        }
-    }
-
-    private fun imageMime(url: String, serverCt: String?, bytes: ByteArray): String? {
-        sniffImage(bytes)?.let { return it } // le contenu réel prime
-        val lower = url.lowercase()
-        when {
-            ".png" in lower -> return "image/png"
-            ".jpg" in lower || ".jpeg" in lower -> return "image/jpeg"
-            ".webp" in lower -> return "image/webp"
-            ".gif" in lower -> return "image/gif"
-            ".svg" in lower -> return "image/svg+xml"
-            ".avif" in lower -> return "image/avif"
-            ".bmp" in lower -> return "image/bmp"
-        }
-        serverCt?.substringBefore(';')?.trim()?.let { if (it.startsWith("image/")) return it }
-        return null
-    }
-
-    private fun sniffImage(b: ByteArray): String? {
-        if (b.size < 12) return null
-        fun c(i: Int, ch: Char) = b[i] == ch.code.toByte()
-        return when {
-            b[0] == 0x89.toByte() && c(1, 'P') && c(2, 'N') && c(3, 'G') -> "image/png"
-            b[0] == 0xFF.toByte() && b[1] == 0xD8.toByte() -> "image/jpeg"
-            c(0, 'G') && c(1, 'I') && c(2, 'F') -> "image/gif"
-            c(0, 'R') && c(1, 'I') && c(2, 'F') && c(8, 'W') && c(9, 'E') && c(10, 'B') && c(11, 'P') -> "image/webp"
-            c(0, 'B') && c(1, 'M') -> "image/bmp"
-            c(0, '<') && (c(1, 's') || c(1, '?')) -> "image/svg+xml"
-            else -> null
-        }
-    }
-
-    // ---- Téléchargements ----
-
-    private fun startDownload(url: String, userAgent: String?, contentDisposition: String?, mimetype: String?) {
-        when {
-            url.startsWith("blob:") -> downloadBlob(url)
-            url.startsWith("data:") -> saveDataUrl(url)
-            else -> withStoragePermission { enqueueHttp(url, userAgent, contentDisposition, mimetype) }
-        }
-    }
-
-    private fun enqueueHttp(url: String, userAgent: String?, contentDisposition: String?, mimetype: String?) {
-        try {
-            val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
-            val req = DownloadManager.Request(Uri.parse(url)).apply {
-                setMimeType(mimetype)
-                CookieManager.getInstance().getCookie(url)?.let { addRequestHeader("cookie", it) }
-                if (!userAgent.isNullOrEmpty()) addRequestHeader("User-Agent", userAgent)
-                setTitle(fileName)
-                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-            }
-            (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
-            toast("Téléchargement de $fileName…")
-        } catch (e: Exception) {
-            toast("Téléchargement impossible : ${e.message}")
-        }
-    }
-
-    // blob: -> lu en JS (FileReader) puis renvoyé en base64 via l'interface.
-    private fun downloadBlob(blobUrl: String) {
-        val js = """
-            (function(){
-              try{
-                fetch('$blobUrl').then(function(r){return r.blob();}).then(function(b){
-                  var fr=new FileReader();
-                  fr.onloadend=function(){ AndroidDownload.saveBase64((fr.result.split(',')[1]||''), (b.type||'')); };
-                  fr.readAsDataURL(b);
-                }).catch(function(e){ AndroidDownload.onError(''+e); });
-              }catch(e){ AndroidDownload.onError(''+e); }
-            })();
-        """.trimIndent()
-        webView.evaluateJavascript(js, null)
-    }
-
-    private fun saveDataUrl(dataUrl: String) {
-        val comma = dataUrl.indexOf(',')
-        if (comma < 0) { toast("data URL invalide"); return }
-        val meta = dataUrl.substring(5, comma) // après "data:"
-        val mime = meta.substringBefore(';').ifEmpty { "application/octet-stream" }
-        val payload = dataUrl.substring(comma + 1)
-        val bytes = if (meta.contains("base64")) Base64.decode(payload, Base64.DEFAULT)
-        else Uri.decode(payload).toByteArray()
-        saveBytesToDownloads("download_${System.currentTimeMillis()}${extFromMime(mime)}", mime, bytes)
-    }
-
-    // Appelé par l'interface JS (blob).
-    fun saveBase64ToDownloads(base64: String, mime: String) {
-        try {
-            val bytes = Base64.decode(base64, Base64.DEFAULT)
-            val m = mime.ifEmpty { "application/octet-stream" }
-            saveBytesToDownloads("download_${System.currentTimeMillis()}${extFromMime(m)}", m, bytes)
-        } catch (e: Exception) {
-            toast("Téléchargement échoué : ${e.message}")
-        }
-    }
-
-    private fun saveBytesToDownloads(name: String, mime: String, bytes: ByteArray) {
-        withStoragePermission {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Downloads.DISPLAY_NAME, name)
-                        put(MediaStore.Downloads.MIME_TYPE, mime)
-                        put(MediaStore.Downloads.IS_PENDING, 1)
-                    }
-                    val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                        ?: throw IOException("insertion MediaStore impossible")
-                    contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-                    values.clear()
-                    values.put(MediaStore.Downloads.IS_PENDING, 0)
-                    contentResolver.update(uri, values, null, null)
-                } else {
-                    @Suppress("DEPRECATION")
-                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    dir.mkdirs()
-                    File(dir, name).outputStream().use { it.write(bytes) }
-                }
-                toast("Enregistré dans Téléchargements : $name")
-            } catch (e: Exception) {
-                toast("Téléchargement échoué : ${e.message}")
-            }
-        }
-    }
-
-    // WRITE_EXTERNAL_STORAGE n'est requis que sur Android ≤ 9 (API < 29).
-    private fun withStoragePermission(action: () -> Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ||
-            checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        ) {
-            action()
-        } else {
-            pendingDownload = action
-            requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), REQ_STORAGE)
-        }
-    }
-
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-        if (requestCode == REQ_STORAGE) {
-            val action = pendingDownload
-            pendingDownload = null
-            if (granted) action?.invoke() else toast("Permission de stockage refusée")
-            return
-        }
-        if (requestCode == REQ_WEBRTC) {
-            val req = pendingWebRequest
-            pendingWebRequest = null
-            if (req == null) return
-            // Accorde uniquement les ressources dont la permission Android est
-            // effectivement accordée (l'utilisateur peut n'en accepter qu'une).
-            val allowed = req.resources.filter { res ->
-                webPermissionFor(res)?.let {
-                    checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
-                } ?: false
-            }
-            if (allowed.isEmpty()) req.deny() else req.grant(allowed.toTypedArray())
-            return
-        }
-        val mediaType = pendingMediaPermission.remove(requestCode) ?: return
-        webView.evaluateJavascript(
-            "window.onMediaPermission && window.onMediaPermission(${JSONObject.quote(mediaType)}, $granted);",
-            null,
-        )
-    }
-
-    // ---- Caméra / micro (getUserMedia dans la page) ----
-
-    // Ressource WebView -> permission Android runtime correspondante.
-    private fun webPermissionFor(resource: String): String? = when (resource) {
-        PermissionRequest.RESOURCE_VIDEO_CAPTURE -> Manifest.permission.CAMERA
-        PermissionRequest.RESOURCE_AUDIO_CAPTURE -> Manifest.permission.RECORD_AUDIO
-        else -> null
-    }
-
-    private fun handleWebPermissionRequest(request: PermissionRequest) {
-        // Sécurité : ne répond qu'aux demandes venant de l'app elle-même
-        // (dist embarqué sur le domaine virtuel, ou l'URL configurée au build).
-        val origin = request.origin?.host ?: ""
-        val appHost = Uri.parse(getString(R.string.app_url)).host ?: ""
-        if (origin != "appassets.androidplatform.net" && origin != appHost) {
-            request.deny()
-            return
-        }
-        val wanted = request.resources.mapNotNull { webPermissionFor(it) }.distinct()
-        if (wanted.isEmpty()) { request.deny(); return }
-
-        val missing = wanted.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
-        if (missing.isEmpty()) {
-            request.grant(request.resources.filter { webPermissionFor(it) != null }.toTypedArray())
-            return
-        }
-        // Une seule demande WebRTC à la fois : la précédente encore en vol est refusée.
-        pendingWebRequest?.deny()
-        pendingWebRequest = request
-        requestPermissions(missing.toTypedArray(), REQ_WEBRTC)
+        if (downloads.onPermissionResult(requestCode, granted)) return
+        if (webRtc.onPermissionResult(requestCode, granted)) return
+        mediaLibrary.onPermissionResult(requestCode, granted)
     }
 
     fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
-    // ---- Médiathèque (musique / vidéos / photos) ----
-
-    private fun mediaPermissionName(type: String): String = when {
-        Build.VERSION.SDK_INT >= 33 && type == "audio" -> Manifest.permission.READ_MEDIA_AUDIO
-        Build.VERSION.SDK_INT >= 33 && type == "video" -> Manifest.permission.READ_MEDIA_VIDEO
-        Build.VERSION.SDK_INT >= 33 && type == "image" -> Manifest.permission.READ_MEDIA_IMAGES
-        else -> Manifest.permission.READ_EXTERNAL_STORAGE
-    }
-
-    fun hasMediaPermission(type: String): Boolean =
-        checkSelfPermission(mediaPermissionName(type)) == PackageManager.PERMISSION_GRANTED
-
-    fun requestMediaPermission(type: String) = runOnUiThread {
-        if (hasMediaPermission(type)) {
-            webView.evaluateJavascript("window.onMediaPermission && window.onMediaPermission(${JSONObject.quote(type)}, true);", null)
-            return@runOnUiThread
-        }
-        val code = when (type) { "audio" -> REQ_MEDIA_AUDIO; "video" -> REQ_MEDIA_VIDEO; else -> REQ_MEDIA_IMAGE }
-        pendingMediaPermission[code] = type
-        requestPermissions(arrayOf(mediaPermissionName(type)), code)
-    }
-
-    // Interroge le MediaStore et renvoie un JSON avec l'URL de streaming (servie
-    // par serveMedia() via le domaine virtuel https de la WebView).
-    fun listMedia(type: String): String {
-        if (!hasMediaPermission(type)) return "[]"
-        val (uri, nameCol, extraCols) = when (type) {
-            "audio" -> Triple(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                MediaStore.Audio.Media.DISPLAY_NAME,
-                arrayOf(MediaStore.Audio.Media.ARTIST, MediaStore.Audio.Media.DURATION),
-            )
-            "video" -> Triple(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                MediaStore.Video.Media.DISPLAY_NAME,
-                arrayOf(MediaStore.Video.Media.DURATION),
-            )
-            else -> Triple(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                MediaStore.Images.Media.DISPLAY_NAME,
-                emptyArray(),
-            )
-        }
-        val idCol = MediaStore.MediaColumns._ID
-        val sizeCol = MediaStore.MediaColumns.SIZE
-        val projection = arrayOf(idCol, nameCol, sizeCol, *extraCols)
-        // Pas de "LIMIT" dans le sortOrder : MediaProvider valide strictement ce
-        // paramètre depuis Android 10 (stockage cloisonné) et rejette tout ce qui
-        // n'est pas juste "colonne ASC/DESC" -> on plafonne dans la boucle à la place.
-        val sort = "${MediaStore.MediaColumns.DATE_ADDED} DESC"
-        val out = JSONArray()
-        try {
-            contentResolver.query(uri, projection, null, null, sort)?.use { c ->
-                val idIdx = c.getColumnIndexOrThrow(idCol)
-                val nameIdx = c.getColumnIndexOrThrow(nameCol)
-                val sizeIdx = c.getColumnIndexOrThrow(sizeCol)
-                val artistIdx = if (type == "audio") c.getColumnIndex(MediaStore.Audio.Media.ARTIST) else -1
-                val durationIdx = if (type != "image") c.getColumnIndex(MediaStore.MediaColumns.DURATION) else -1
-                while (c.moveToNext() && out.length() < 300) {
-                    val id = c.getLong(idIdx)
-                    val o = JSONObject()
-                    o.put("id", id)
-                    o.put("name", c.getString(nameIdx) ?: "")
-                    o.put("size", c.getLong(sizeIdx))
-                    o.put("url", "http://127.0.0.1:${mediaServer?.port ?: 0}/media/$type/$id")
-                    if (artistIdx >= 0) o.put("artist", c.getString(artistIdx) ?: "")
-                    if (durationIdx >= 0) o.put("duration", c.getLong(durationIdx))
-                    out.put(o)
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MediaBridge", "listMedia($type) a échoué", e)
-            return "[]"
-        }
-        return out.toString()
-    }
-
-    // Construit le corps de réponse d'un fichier de la médiathèque pour le
-    // serveur HTTP local (voir [LoopbackMediaServer]), avec support des
-    // requêtes "Range" (requis par <audio>/<video> pour démarrer la lecture).
-    private fun buildMediaBody(path: String, rangeHeader: String?): MediaBody? {
-        val m = Regex("^/media/(audio|video|image)/(\\d+)$").find(path) ?: return null
-        val type = m.groupValues[1]
-        val id = m.groupValues[2].toLongOrNull() ?: return null
-        val base = when (type) {
-            "audio" -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-            "video" -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            else -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        }
-        val uri = ContentUris.withAppendedId(base, id)
-        return try {
-            val afd = contentResolver.openAssetFileDescriptor(uri, "r") ?: return null
-            val total = afd.length
-            val mime = contentResolver.getType(uri) ?: "application/octet-stream"
-            val range = if (rangeHeader != null && total > 0) parseRange(rangeHeader, total) else null
-            val stream = afd.createInputStream()
-            if (range != null) {
-                val (start, end) = range
-                stream.skip(start)
-                val len = end - start + 1
-                MediaBody(BoundedInputStream(stream, len), mime, len, true, start, end, total)
-            } else {
-                MediaBody(stream, mime, total, false)
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MediaBridge", "buildMediaBody($path) a échoué", e)
-            null
-        }
-    }
-
-    private fun parseRange(header: String, total: Long): Pair<Long, Long>? {
-        val m = Regex("""bytes=(\d*)-(\d*)""").find(header) ?: return null
-        val start = m.groupValues[1].toLongOrNull() ?: 0L
-        val end = m.groupValues[2].toLongOrNull() ?: (total - 1)
-        if (start >= total || start > end) return null
-        return start to minOf(end, total - 1)
-    }
-
     override fun onDestroy() {
         super.onDestroy()
-        mediaServer?.close()
-    }
-
-    // ---- Autres capacités natives (démo) ----
-
-    fun vibrateDevice(ms: Long) {
-        val v = getSystemService(Vibrator::class.java) ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            v.vibrate(ms)
-        }
-    }
-
-    fun shareText(text: String) = runOnUiThread {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-        startActivity(Intent.createChooser(intent, null))
-    }
-
-    fun batteryLevel(): Int {
-        val bm = getSystemService(BATTERY_SERVICE) as BatteryManager
-        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-    }
-
-    private fun extFromMime(mime: String): String = when (mime.substringBefore(';').trim()) {
-        "image/png" -> ".png"
-        "image/jpeg" -> ".jpg"
-        "image/gif" -> ".gif"
-        "image/webp" -> ".webp"
-        "image/svg+xml" -> ".svg"
-        "application/pdf" -> ".pdf"
-        "text/plain" -> ".txt"
-        "text/csv" -> ".csv"
-        "application/json" -> ".json"
-        "application/zip" -> ".zip"
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> ".xlsx"
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> ".docx"
-        else -> ""
+        mediaLibrary.close()
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -776,201 +190,17 @@ class MainActivity : Activity() {
     }
 }
 
-/** Pont JS pour récupérer les téléchargements blob: (base64 -> fichier). */
-private class DownloadBridge(private val activity: MainActivity) {
-    @JavascriptInterface
-    fun saveBase64(base64: String, type: String) {
-        activity.runOnUiThread { activity.saveBase64ToDownloads(base64, type) }
-    }
-
-    @JavascriptInterface
-    fun onError(msg: String) {
-        activity.runOnUiThread { activity.toast("Téléchargement échoué : $msg") }
-    }
-}
-
-/**
- * Pont JS pour lire la médiathèque du téléphone (musique/vidéos/photos).
- * `list(type)` renvoie un JSON avec, pour chaque élément, une `url` https
- * jouable/affichable directement (servie par [MediaPathHandler]).
- */
-private class MediaBridge(private val activity: MainActivity) {
-    @JavascriptInterface
-    fun hasPermission(type: String): Boolean = activity.hasMediaPermission(type)
-
-    @JavascriptInterface
-    fun requestPermission(type: String) = activity.requestMediaPermission(type)
-
-    @JavascriptInterface
-    fun list(type: String): String = activity.listMedia(type)
-}
-
-/** Pont JS pour quelques capacités natives supplémentaires (démo). */
-private class DeviceBridge(private val activity: MainActivity) {
-    @JavascriptInterface
-    fun vibrate(ms: Long) = activity.vibrateDevice(ms)
-
-    @JavascriptInterface
-    fun share(text: String) = activity.shareText(text)
-
-    @JavascriptInterface
-    fun batteryLevel(): Int = activity.batteryLevel()
-}
-
-/**
- * Sert les fichiers du dossier assets/www comme si www/ était la racine du site.
- * Une requête vers https://appassets.androidplatform.net/assets/x.js renvoie
- * assets/www/assets/x.js — d'où le support des chemins absolus des SPA.
- */
-private class WwwPathHandler(
-    private val assets: AssetManager,
-) : WebViewAssetLoader.PathHandler {
-    override fun handle(path: String): WebResourceResponse? {
-        var clean = Uri.decode(path).trimStart('/')
-        if (clean.isEmpty() || clean.endsWith("/")) clean += "index.html"
-        return try {
-            open(clean)
-        } catch (e: IOException) {
-            // Fallback SPA (routing par URL) : une "route" sans extension de
-            // fichier retombe sur index.html, comme "try_files $uri /index.html".
-            if (!clean.substringAfterLast('/').contains('.')) {
-                try { open("index.html") } catch (e2: IOException) { null }
-            } else {
-                null
-            }
-        }
-    }
-
-    private fun open(rel: String): WebResourceResponse {
-        val stream = assets.open("www/$rel")
-        return WebResourceResponse(mimeOf(rel), null, stream)
-    }
-
-    private fun mimeOf(name: String): String = when (name.substringAfterLast('.').lowercase()) {
-        "html", "htm" -> "text/html"
-        "js", "mjs" -> "application/javascript"
-        "css" -> "text/css"
-        "json", "map" -> "application/json"
-        "svg" -> "image/svg+xml"
-        "png" -> "image/png"
-        "jpg", "jpeg" -> "image/jpeg"
-        "gif" -> "image/gif"
-        "webp" -> "image/webp"
-        "avif" -> "image/avif"
-        "ico" -> "image/x-icon"
-        "woff2" -> "font/woff2"
-        "woff" -> "font/woff"
-        "ttf" -> "font/ttf"
-        "wasm" -> "application/wasm"
-        "txt" -> "text/plain"
-        else -> "application/octet-stream"
-    }
-}
-
-/**
- * Limite un InputStream à `limit` octets (pour servir une tranche "Range" d'un
- * fichier sans lire au-delà de ce qui a été annoncé en Content-Length).
- */
-private class BoundedInputStream(private val src: InputStream, private var remaining: Long) : InputStream() {
-    override fun read(): Int {
-        if (remaining <= 0) return -1
-        val b = src.read()
-        if (b >= 0) remaining--
-        return b
-    }
-    override fun read(b: ByteArray, off: Int, len: Int): Int {
-        if (remaining <= 0) return -1
-        val n = src.read(b, off, minOf(len.toLong(), remaining).toInt())
-        if (n > 0) remaining -= n
-        return n
-    }
-    override fun close() = src.close()
-}
-
-/** Réponse à servir par [LoopbackMediaServer] pour un fichier de la médiathèque. */
-private class MediaBody(
-    val stream: InputStream,
-    val mime: String,
-    val length: Long,
-    val partial: Boolean,
-    val start: Long = 0,
-    val end: Long = 0,
-    val total: Long = 0,
-)
-
-/**
- * Mini serveur HTTP en boucle locale (127.0.0.1, port aléatoire) qui sert la
- * médiathèque. Contrairement au domaine virtuel https de WebViewAssetLoader,
- * un vrai socket loopback est joignable par le lecteur média natif d'Android
- * (utilisé en coulisse par <audio>/<video>), qui ouvre sa propre connexion
- * réseau en dehors des hooks de la WebView.
- */
-private class LoopbackMediaServer(
-    private val serve: (path: String, range: String?) -> MediaBody?,
-) : Thread("media-server") {
-    private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
-    // Pool réutilisable plutôt qu'un Thread natif par connexion : pendant une
-    // recherche (seek), le lecteur vidéo peut ouvrir de nombreuses requêtes en
-    // rafale, et un Thread par connexion a fini par épuiser la mémoire de
-    // l'appareil (déclenchant le tueur mémoire système).
-    private val pool = Executors.newCachedThreadPool()
-    val port: Int get() = server.localPort
-
-    override fun run() {
-        while (!server.isClosed) {
-            val socket = try { server.accept() } catch (e: IOException) { return }
-            pool.execute { handle(socket) }
-        }
-    }
-
-    fun close() {
-        try { server.close() } catch (e: IOException) { /* déjà fermé */ }
-        pool.shutdownNow()
-    }
-
-    // Connexion persistante (keep-alive) : traite toutes les requêtes envoyées
-    // sur le même socket (le lecteur vidéo réutilise la connexion pour chaque
-    // segment/seek au lieu d'en ouvrir une nouvelle à chaque fois).
-    private fun handle(socket: Socket) {
-        socket.use { s ->
-            s.soTimeout = 15000
-            try {
-                val reader = s.getInputStream().bufferedReader(Charsets.ISO_8859_1)
-                while (!s.isClosed) {
-                    val requestLine = reader.readLine() ?: break
-                    if (requestLine.isBlank()) continue
-                    val path = requestLine.split(" ").getOrNull(1)?.substringBefore('?') ?: break
-                    var range: String? = null
-                    while (true) {
-                        val line = reader.readLine() ?: return
-                        if (line.isEmpty()) break
-                        val i = line.indexOf(':')
-                        if (i > 0 && line.take(i).equals("Range", true)) range = line.substring(i + 1).trim()
-                    }
-                    writeResponse(s.getOutputStream(), serve(path, range))
-                }
-            } catch (e: Exception) {
-                // Connexion interrompue par le lecteur (seek, arrêt) : normal.
-            }
-        }
-    }
-
-    private fun writeResponse(out: OutputStream, body: MediaBody?) {
-        if (body == null) {
-            out.write("HTTP/1.1 404 Not Found\r\nConnection: keep-alive\r\n\r\n".toByteArray(Charsets.ISO_8859_1))
-            return
-        }
-        val status = if (body.partial) "206 Partial Content" else "200 OK"
-        val headers = buildString {
-            append("HTTP/1.1 $status\r\n")
-            append("Content-Type: ${body.mime}\r\n")
-            append("Content-Length: ${body.length}\r\n")
-            append("Accept-Ranges: bytes\r\n")
-            if (body.partial) append("Content-Range: bytes ${body.start}-${body.end}/${body.total}\r\n")
-            append("Connection: keep-alive\r\n\r\n")
-        }
-        out.write(headers.toByteArray(Charsets.ISO_8859_1))
-        body.stream.use { it.copyTo(out) }
-        out.flush()
-    }
-}
+// Injecté dans la page pour capturer les erreurs JS/promesses non gérées et les
+// remonter dans la console de debug flottante (avec sniff du type réel des
+// ressources image en échec, pour diagnostiquer les mismatch de Content-Type).
+private const val DEBUG_CAPTURE_JS = """(function(){if(window.__dbg)return;window.__dbg=1;
+   window.addEventListener('error',function(e){
+     var t=e.target||e.srcElement;
+     if(t&&(t.tagName==='IMG'||t.tagName==='SCRIPT'||t.tagName==='LINK')){
+       var u=t.currentSrc||t.src||t.href;
+       console.error('RES fail ['+t.tagName+']: '+u);
+       try{fetch(u).then(function(r){console.error('  -> HTTP '+r.status+' ct='+r.headers.get('content-type'));return r.arrayBuffer();}).then(function(buf){var a=new Uint8Array(buf).subarray(0,4);var hex=[].map.call(a,function(x){return ('0'+x.toString(16)).slice(-2);}).join('');var kind=(hex.slice(0,4)==='ffd8')?'JPEG ok':(hex.slice(0,8)==='89504e47')?'PNG ok':(hex.slice(0,6)==='474946')?'GIF ok':'PAS une image (chiffre?)';console.error('  -> '+buf.byteLength+'o magic='+hex+' '+kind);}).catch(function(err){console.error('  -> fetch err: '+err);});}catch(_){}
+     } else { console.error('JS: '+e.message+' @'+e.filename+':'+e.lineno); }
+   },true);
+   window.addEventListener('unhandledrejection',function(e){var r=e.reason;console.error('Promise: '+((r&&(r.stack||r.message))||r));});
+})();"""
