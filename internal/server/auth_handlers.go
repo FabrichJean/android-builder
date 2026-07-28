@@ -23,7 +23,12 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"enabled": true, "logged_in": false})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"enabled": true, "logged_in": true, "user": u})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"enabled": true, "logged_in": true, "user": u,
+		// La génération d'app par IA n'est proposée qu'aux comptes connectés,
+		// et seulement si le CLI claude est disponible sur le serveur.
+		"gen": s.gen.Enabled(),
+	})
 }
 
 func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +68,8 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusFound)
+	// Retour direct dans le studio (la racine est la landing marketing).
+	http.Redirect(w, r, "/app", http.StatusFound)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {

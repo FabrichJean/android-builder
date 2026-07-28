@@ -303,6 +303,7 @@
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     formError.textContent = "";
+    if (genMode && mode !== "bundle") { genStart(); return; }
 
     const appName = $("name").value.trim();
     const pkg = $("pkg").value.trim();
@@ -675,6 +676,171 @@
     $("pkg").placeholder = name ? derivePackage(name) : "app.webview.monapplication";
   });
 
+  // ---- génération d'app par IA (CLI claude du serveur, comptes connectés) ----
+  // Flux : description → questions de clarification (choix) rendues dans le
+  // prompteur → vérification du budget tokens (estimation AVANT génération)
+  // → génération suivie en SSE → dist.zip réinjecté dans le pipeline bundle.
+  const genPanel = $("genPanel"), genToggle = $("genToggle");
+  let genMode = false, genBusy = false, genSession = null, genES = null;
+  const URL_PLACEHOLDER = "https://exemple.com — ou glisse-dépose un dossier / .zip…";
+  const GEN_PLACEHOLDER = "Décris l'app à générer (ex. une liste de courses avec catégories et totaux)…";
+
+  function setGenMode(on) {
+    genMode = on;
+    genToggle.classList.toggle("active", on);
+    $("url").placeholder = on ? GEN_PLACEHOLDER : URL_PLACEHOLDER;
+    if (on && mode === "bundle") clearDist();
+    if (!on) genReset();
+  }
+  genToggle.addEventListener("click", () => setGenMode(!genMode));
+
+  function genReset() {
+    if (genES) { genES.close(); genES = null; }
+    genSession = null; genBusy = false;
+    genPanel.hidden = true; genPanel.innerHTML = "";
+  }
+
+  async function genStart() {
+    if (genBusy) return;
+    const desc = $("url").value.trim();
+    if (desc.length < 10) return fail("Décris l'app un peu plus (10 caractères minimum).");
+    if (/^https?:\/\//.test(desc)) return fail("Ceci ressemble à une URL — désactive « Générer par IA » pour encapsuler une URL.");
+    genReset();
+    genBusy = true; submit.disabled = true;
+    genPanel.hidden = false;
+    genPanel.innerHTML = `<div class="gen-progress"><span class="spin"></span>Claude prépare des questions pour préciser ton app…</div>`;
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: desc }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur serveur");
+      genSession = data;
+      if (data.status === "over_budget") renderGenOverBudget(data);
+      else renderGenQuestions(data);
+    } catch (err) {
+      genReset();
+      fail(err.message);
+    } finally {
+      genBusy = false; submit.disabled = false;
+    }
+  }
+
+  function renderGenQuestions(s) {
+    const qs = (s.questions || []).map((q, i) => `
+      <div class="gq" data-q="${esc(q.id || "q" + i)}">
+        <div class="gq-label">${esc(q.label)}</div>
+        <div class="gq-opts">${(q.options || []).map(o =>
+          `<button type="button" class="gq-opt" data-val="${esc(o)}">${esc(o)}</button>`).join("")}
+        </div>
+      </div>`).join("");
+    genPanel.innerHTML = `
+      ${qs}
+      <div class="gen-note">Consommation estimée : ~${s.estimated_tokens || "?"} tokens (limite ${s.token_limit}).</div>
+      <div class="gen-actions">
+        <button type="button" class="btn-ghost" id="genCancel">Annuler</button>
+        <button type="button" class="btn-gold" id="genGo" disabled>Lancer la génération</button>
+      </div>`;
+    genPanel.querySelectorAll(".gq-opt").forEach(btn => {
+      btn.addEventListener("click", () => {
+        btn.closest(".gq").querySelectorAll(".gq-opt").forEach(b => b.classList.toggle("selected", b === btn));
+        const all = [...genPanel.querySelectorAll(".gq")]
+          .every(g => g.querySelector(".gq-opt.selected"));
+        $("genGo").disabled = !all;
+      });
+    });
+    $("genCancel").addEventListener("click", genReset);
+    $("genGo").addEventListener("click", genLaunch);
+  }
+
+  async function genLaunch() {
+    if (!genSession || genBusy) return;
+    const answers = {};
+    genPanel.querySelectorAll(".gq").forEach(g => {
+      const sel = g.querySelector(".gq-opt.selected");
+      if (sel) answers[g.dataset.q] = sel.dataset.val;
+    });
+    genBusy = true;
+    renderGenProgress(0, genSession.token_limit);
+    try {
+      const res = await fetch(`/api/generate/${genSession.id}/answers`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur serveur");
+      genSubscribe(genSession.id);
+    } catch (err) {
+      genBusy = false;
+      genReset();
+      fail(err.message);
+    }
+  }
+
+  function renderGenProgress(used, limit) {
+    const pct = Math.min(100, Math.round(used * 100 / (limit || 1)));
+    genPanel.innerHTML = `
+      <div class="gen-progress"><span class="spin"></span>Claude génère ton app…
+        <span class="gen-tokens">${used} / ${limit} tokens</span>
+      </div>
+      <div class="track"><span style="width:${pct}%"></span></div>`;
+  }
+
+  function genSubscribe(id) {
+    genES = new EventSource(`/api/generate/${id}/events`);
+    genES.onmessage = async (e) => {
+      let s;
+      try { s = JSON.parse(e.data); } catch { return; }
+      if (s.status === "generating") { renderGenProgress(s.tokens_used || 0, s.token_limit); return; }
+      genES.close(); genES = null; genBusy = false;
+      if (s.status === "success") await genFinish(s);
+      else if (s.status === "over_budget") renderGenOverBudget(s);
+      else { genReset(); fail(s.error || "Génération échouée."); }
+    };
+  }
+
+  // Récupère le dist généré, l'installe comme projet importé et enchaîne le build.
+  async function genFinish(s) {
+    try {
+      const res = await fetch(`/api/generate/${s.id}/dist.zip`);
+      if (!res.ok) throw new Error("archive générée indisponible");
+      const blob = await res.blob();
+      if (!$("name").value.trim() && s.app_name) {
+        $("name").value = s.app_name;
+        updatePreview();
+      }
+      setGenMode(false);
+      setDist(blob, `App générée par IA · ${s.tokens_used} tokens`);
+      form.requestSubmit(); // lance le build APK avec le pipeline bundle existant
+    } catch (err) {
+      genReset();
+      fail(err.message);
+    }
+  }
+
+  function renderGenOverBudget(s) {
+    const lighter = s.lighter_description || "";
+    genPanel.hidden = false;
+    genPanel.innerHTML = `
+      <div class="gen-over">
+        <div class="gen-over-title">Budget de tokens dépassé</div>
+        <div class="gen-note">${esc(s.error || `L'app décrite dépasserait la limite de ${s.token_limit} tokens.`)}</div>
+        ${lighter ? `<div class="gen-lighter">Suggestion plus légère : « ${esc(lighter)} »</div>` : ""}
+      </div>
+      <div class="gen-actions">
+        <button type="button" class="btn-ghost" id="genCancel">Fermer</button>
+        ${lighter ? `<button type="button" class="btn-gold" id="genUseLighter">Utiliser cette description</button>` : ""}
+      </div>`;
+    $("genCancel").addEventListener("click", genReset);
+    const useBtn = $("genUseLighter");
+    if (useBtn) useBtn.addEventListener("click", () => {
+      $("url").value = lighter;
+      genReset();
+      genStart();
+    });
+  }
+
   // ---- connexion Google (optionnelle) : historique privé par compte ----
   async function loadServerHistory() {
     try {
@@ -717,7 +883,7 @@
       $("accountUser").hidden = false;
       $("accountName").textContent = data.user.name || data.user.email || "Compte";
       setAvatar(data.user);
-      setLoggedInMode();
+      setLoggedInMode(!!data.gen);
       await loadServerHistory();
     } catch {
       // API indisponible : on retombe sur le mode anonyme (historique local).
@@ -743,14 +909,14 @@
     location.reload();
   });
 
-  // ---- sidebar : navigation Accueil/Historique (vraies pages "/" et "/historique") ----
+  // ---- sidebar : navigation Accueil/Historique (vraies pages "/app" et "/historique") ----
   const sbViews = { home: $("view-home"), history: $("view-history") };
-  const VIEW_PATH = { home: "/", history: "/historique" };
+  const VIEW_PATH = { home: "/app", history: "/historique" };
   function viewForPath(path) { return path === "/historique" ? "history" : "home"; }
   function switchView(name, push = true) {
     document.querySelectorAll(".sb-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
     Object.entries(sbViews).forEach(([k, el]) => { el.hidden = k !== name; });
-    const path = VIEW_PATH[name] || "/";
+    const path = VIEW_PATH[name] || "/app";
     if (push && location.pathname !== path) history.pushState({ view: name }, "", path);
   }
   document.querySelectorAll(".sb-item").forEach((btn) => {
@@ -766,6 +932,8 @@
   // directement l'historique complet (local) sous le formulaire, sans limite.
   function setAnonymousMode(canLogin) {
     persistLocal = true;
+    setGenMode(false);
+    genToggle.hidden = true; // génération par IA réservée aux comptes connectés
     $("sidebar").hidden = true;
     $("anonTopbar").hidden = !canLogin;
     RECENT_COUNT = Infinity;
@@ -774,8 +942,9 @@
     switchView("home", false);
     renderRecent();
   }
-  function setLoggedInMode() {
+  function setLoggedInMode(genAvailable) {
     persistLocal = false;
+    genToggle.hidden = !genAvailable;
     $("sidebar").hidden = false;
     $("anonTopbar").hidden = true;
     RECENT_COUNT = 6;
