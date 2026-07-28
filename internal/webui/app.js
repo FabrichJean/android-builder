@@ -696,7 +696,7 @@
     if (!on) genReset();
   }
   genToggle.addEventListener("click", () => {
-    if (genNeedsLogin) { location.href = "/auth/google/login"; return; }
+    if (genNeedsLogin) { location.href = "/auth/google/login?next=gen"; return; }
     setGenMode(!genMode);
   });
 
@@ -997,6 +997,13 @@
       ? "Génération IA désactivée pour ce compte (trop de demandes refusées)"
       : "Décris ton app, Claude la génère sur le serveur";
     if (genBanned) setGenMode(false);
+    // Retour de la connexion Google déclenchée par un clic sur "Générer par
+    // IA" en anonyme (?gen=1, posé par le callback OAuth) : rallume le mode
+    // génération directement, sans re-clic, puis nettoie l'URL.
+    if (genAvailable && !genBanned && new URLSearchParams(location.search).get("gen") === "1") {
+      setGenMode(true);
+      history.replaceState(null, "", location.pathname);
+    }
     $("sidebar").hidden = false;
     $("anonTopbar").hidden = true;
     RECENT_COUNT = 6;
