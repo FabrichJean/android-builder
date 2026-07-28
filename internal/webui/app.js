@@ -23,12 +23,18 @@
   };
 
   let builds = load();
+  // Le localStorage ne doit contenir QUE l'historique anonyme (sans compte).
+  // Quand un compte est connecté, `builds` est remplacé par l'historique serveur
+  // (privé à ce compte) mais ne doit jamais être persisté ici, sinon il polluerait
+  // l'historique anonyme et resterait visible après déconnexion.
+  let persistLocal = true;
 
   function load() {
     try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
     catch { return []; }
   }
   function save() {
+    if (!persistLocal) return;
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(builds));
     } catch {
@@ -759,6 +765,7 @@
   // Sans sidebar, "/historique" n'est plus atteignable depuis l'UI : on affiche
   // directement l'historique complet (local) sous le formulaire, sans limite.
   function setAnonymousMode(canLogin) {
+    persistLocal = true;
     $("sidebar").hidden = true;
     $("anonTopbar").hidden = !canLogin;
     RECENT_COUNT = Infinity;
@@ -768,6 +775,7 @@
     renderRecent();
   }
   function setLoggedInMode() {
+    persistLocal = false;
     $("sidebar").hidden = false;
     $("anonTopbar").hidden = true;
     RECENT_COUNT = 6;
