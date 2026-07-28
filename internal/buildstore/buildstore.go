@@ -100,6 +100,12 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// DB expose la connexion sous-jacente pour les autres composants qui ont
+// besoin de leurs propres tables dans le même fichier SQLite (ex. le suivi
+// des abus de génération d'app par IA) — évite d'ouvrir une seconde connexion
+// concurrente vers le même fichier.
+func (s *Store) DB() *sql.DB { return s.db }
+
 // Create enregistre un nouveau build.
 func (s *Store) Create(b *Build) error {
 	now := time.Now()
