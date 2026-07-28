@@ -682,6 +682,9 @@
   // → génération suivie en SSE → dist.zip réinjecté dans le pipeline bundle.
   const genPanel = $("genPanel"), genToggle = $("genToggle");
   let genMode = false, genBusy = false, genSession = null, genES = null;
+  // Anonyme : le bouton reste visible mais redirige vers la connexion Google
+  // au lieu d'activer le mode génération (réservé aux comptes connectés).
+  let genNeedsLogin = false;
   const URL_PLACEHOLDER = "https://exemple.com — ou glisse-dépose un dossier / .zip…";
   const GEN_PLACEHOLDER = "Décris l'app à générer (ex. une liste de courses avec catégories et totaux)…";
 
@@ -692,7 +695,10 @@
     if (on && mode === "bundle") clearDist();
     if (!on) genReset();
   }
-  genToggle.addEventListener("click", () => setGenMode(!genMode));
+  genToggle.addEventListener("click", () => {
+    if (genNeedsLogin) { location.href = "/auth/google/login"; return; }
+    setGenMode(!genMode);
+  });
 
   function genReset() {
     if (genES) { genES.close(); genES = null; }
@@ -968,7 +974,12 @@
   function setAnonymousMode(canLogin) {
     persistLocal = true;
     setGenMode(false);
-    genToggle.hidden = true; // génération par IA réservée aux comptes connectés
+    // Visible mais mène à la connexion Google : la génération elle-même
+    // reste réservée aux comptes connectés.
+    genToggle.hidden = !canLogin;
+    genToggle.disabled = false;
+    genNeedsLogin = canLogin;
+    genToggle.title = "Connecte-toi avec Google pour générer une app par IA";
     $("sidebar").hidden = true;
     $("anonTopbar").hidden = !canLogin;
     RECENT_COUNT = Infinity;
@@ -979,6 +990,7 @@
   }
   function setLoggedInMode(genAvailable, genBanned) {
     persistLocal = false;
+    genNeedsLogin = false;
     genToggle.hidden = !genAvailable;
     genToggle.disabled = !!genBanned;
     genToggle.title = genBanned
