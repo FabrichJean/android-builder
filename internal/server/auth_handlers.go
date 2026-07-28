@@ -28,6 +28,9 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		// La génération d'app par IA n'est proposée qu'aux comptes connectés,
 		// et seulement si le CLI claude est disponible sur le serveur.
 		"gen": s.gen.Enabled(),
+		// Compte banni de la génération IA (trop de demandes refusées) : le
+		// reste du service (builds URL/projet, historique) reste utilisable.
+		"gen_banned": s.gen.IsBanned(u.ID),
 	})
 }
 

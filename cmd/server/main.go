@@ -54,7 +54,7 @@ func main() {
 	} else {
 		log.Info("génération d'app par IA activée", "bin", claudeBin, "limite_tokens", cfg.GenTokenLimit)
 	}
-	genMgr := appgen.New(claudeBin, cfg.GenTokenLimit, log)
+	genMgr := appgen.New(claudeBin, cfg.GenTokenLimit, store.DB(), log)
 
 	gh := ghclient.New(cfg.Token, cfg.Owner, cfg.Repo, cfg.Workflow)
 	srv := server.New(cfg, gh, store, authMgr, genMgr, log)
