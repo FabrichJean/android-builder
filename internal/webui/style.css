@@ -85,7 +85,11 @@
   .main { flex: 1; min-width: 0; overflow-y: auto; height: 100vh; }
   .view[hidden] { display: none; }
 
-  .anon-topbar { display: flex; justify-content: flex-end; padding: 16px 28px 0; }
+  .anon-topbar {
+    display: flex; justify-content: flex-end; padding: 16px 28px;
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(8,7,3,0.78); backdrop-filter: blur(8px);
+  }
   .anon-topbar[hidden] { display: none; }
   .anon-login-btn {
     display: flex; align-items: center; gap: 9px; text-align: left;
