@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>APK Builder — ton site devient une app Android</title>
+<meta name="description" content="Transforme une URL, un projet web ou une simple description en APK Android. Build cloud en ~60 secondes." />
+<link rel="stylesheet" href="/landing.css" />
+</head>
+<body>
+
+  <!-- ===== barre de navigation ===== -->
+  <header class="nav">
+    <a class="nav-brand" href="/">
+      <svg class="ic" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+      APK Builder
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Fonctionnalités</a>
+      <a href="#how">Comment ça marche</a>
+      <a href="#ia">Génération IA</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="btn-gold nav-cta" href="/app">Ouvrir le studio</a>
+  </header>
+
+  <!-- ===== héro ===== -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="pill-badge reveal">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></svg>
+        URL, projet web ou simple idée → APK
+      </div>
+      <h1 class="reveal">Ton site devient<br/><span class="grad">une app Android.</span></h1>
+      <p class="sub reveal">Colle une URL, glisse ton projet web, ou décris ton idée —<br class="br-lg"/>
+        le cloud compile et te rend une APK en environ une minute.</p>
+
+      <!-- prompteur factice, clin d'œil au vrai studio -->
+      <a class="mock-prompt reveal" href="/app" aria-label="Ouvrir le studio">
+        <span class="mp-text"><span id="typed"></span><span class="caret"></span></span>
+        <span class="mp-actions">
+          <span class="mp-import">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+            Importer
+          </span>
+          <span class="mp-go">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M12 19V6"/><path d="M6 12l6-7 6 7"/></svg>
+          </span>
+        </span>
+      </a>
+
+      <div class="hero-ctas reveal">
+        <a class="btn-gold big" href="/app">Builder ma première APK</a>
+        <span class="hero-hint">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+          ~60 s par build · sans installation locale
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== trois façons de créer ===== -->
+  <section class="ways">
+    <div class="ways-grid">
+      <div class="way reveal">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a17 17 0 0 1 0 18M12 3a17 17 0 0 0 0 18"/></svg>
+        <h3>Une URL</h3>
+        <p>Ton site existe déjà ? Colle son adresse, il devient une app plein écran.</p>
+      </div>
+      <div class="way reveal">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+        <h3>Un projet web</h3>
+        <p>Glisse ton dossier <code>dist/</code> ou un .zip : l'app embarque tout, et marche hors-ligne.</p>
+      </div>
+      <div class="way reveal">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.4 9l-4.6 1.8L12 15.4l-1.8-4.6L5.6 9l4.6-1.4L12 3z"/><path d="M19 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z"/></svg>
+        <h3>Une idée</h3>
+        <p>Décris l'app en une phrase, Claude la code sur le serveur, le build s'enchaîne.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== fonctionnalités (bento : chaque carte embarque une maquette d'UI) ===== -->
+  <section class="features" id="features">
+    <div class="bento-head reveal">
+      <span class="bh-kicker">Pas juste un site dans une coquille</span>
+      <h2 class="bh-title">Une vraie app Android</h2>
+      <p class="section-sub">Des capacités natives, à activer à la carte sur chaque build.</p>
+    </div>
+
+    <div class="bento-grid">
+      <!-- audio en arrière-plan : notification média -->
+      <article class="bcard reveal">
+        <h3>Audio en arrière-plan</h3>
+        <p>Un vrai service Android garde le son en vie, écran éteint compris.</p>
+        <div class="bmock">
+          <div class="mock-notif">
+            <div class="mn-head">
+              <span class="mn-ic"><svg class="ic" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg></span>
+              <span class="mn-meta"><strong>Ma playlist</strong><small>En lecture · arrière-plan</small></span>
+              <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+            </div>
+            <div class="mn-ctrl" aria-hidden="true">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M19 5v14L8 12l11-7z"/><path d="M6 5v14"/></svg>
+              <span class="mn-play"><svg class="ic" viewBox="0 0 24 24"><path d="M9 5v14"/><path d="M16 5v14"/></svg></span>
+              <svg class="ic" viewBox="0 0 24 24"><path d="M5 5v14l11-7L5 5z"/><path d="M18 5v14"/></svg>
+            </div>
+          </div>
+          <div class="mock-status"><span class="dot-ok"></span>Écran éteint — l'audio continue</div>
+        </div>
+      </article>
+
+      <!-- picture-in-picture : écran d'accueil + mini-fenêtre -->
+      <article class="bcard reveal">
+        <h3>Picture-in-Picture</h3>
+        <p>On quitte l'app pendant une vidéo ? Elle se réduit en fenêtre flottante.</p>
+        <div class="bmock">
+          <div class="mock-home" aria-hidden="true">
+            <span class="mh-app"></span><span class="mh-app"></span><span class="mh-app"></span><span class="mh-app"></span>
+            <span class="mh-app"></span><span class="mh-app"></span><span class="mh-app"></span><span class="mh-app"></span>
+            <div class="mh-pip">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M8 5v14l11-7L8 5z"/></svg>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- console de debug : terminal -->
+      <article class="bcard reveal">
+        <h3>Console de debug</h3>
+        <p>Erreurs JS, CORS, mixed content — affichées dans l'app, et réparées quand c'est possible.</p>
+        <div class="bmock">
+          <div class="mock-console">
+            <div class="mc-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="mc-line err">[erreur] TypeError: cart.map is not a function</div>
+            <div class="mc-line warn">[cors] image bloquée : produits/photo.jpg</div>
+            <div class="mc-line ok">[proxy] image réparée et chargée</div>
+            <div class="mc-line dim">visible directement à l'écran<span class="mc-caret"></span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- personnalisation : icône, splash, couleurs -->
+      <article class="bcard wide reveal">
+        <h3>Ton identité, pas la nôtre</h3>
+        <p>Icône recadrée en direct, splash à ta couleur, nom et version : chaque APK te ressemble.</p>
+        <div class="bmock mock-custom">
+          <div class="mcu-left" aria-hidden="true">
+            <span class="mcu-icon"><svg class="ic andro" viewBox="0 0 24 24"><path d="M5.5 16a6.5 6.5 0 0 1 13 0z"/><path d="M8 8.8 6.4 6.4M16 8.8l1.6-2.4"/><circle cx="9.7" cy="12.6" r="0.9" fill="currentColor" stroke="none"/><circle cx="14.3" cy="12.6" r="0.9" fill="currentColor" stroke="none"/></svg></span>
+            <span class="mcu-swatches">
+              <i style="background:#14110b" class="sel"></i>
+              <i style="background:#2a4d3f"></i>
+              <i style="background:#4d2a3f"></i>
+              <em>#14110B</em>
+            </span>
+          </div>
+          <div class="mcu-phone" aria-hidden="true">
+            <div class="mcu-screen">
+              <span class="mcu-appicon"><svg class="ic andro" viewBox="0 0 24 24"><path d="M5.5 16a6.5 6.5 0 0 1 13 0z"/><path d="M8 8.8 6.4 6.4M16 8.8l1.6-2.4"/><circle cx="9.7" cy="12.6" r="0.9" fill="currentColor" stroke="none"/><circle cx="14.3" cy="12.6" r="0.9" fill="currentColor" stroke="none"/></svg></span>
+              <span class="mcu-appname">Mon App</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- suivi en direct + historique privé : checklist de build -->
+      <article class="bcard wide reveal">
+        <h3>Suivi en direct, historique privé</h3>
+        <p>Chaque étape du build en temps réel. Connecté avec Google, tes builds te suivent — et restent à toi.</p>
+        <div class="bmock">
+          <div class="mock-plan">
+            <div class="mp-row done"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>Checkout du template Android</div>
+            <div class="mp-row done"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg>Nom, icône et options injectés</div>
+            <div class="mp-row run"><span class="mp-spin"></span>Compilation Gradle…</div>
+            <div class="mp-row todo"><i></i>Publication de l'APK</div>
+            <div class="mp-track" aria-hidden="true"><i><span style="width:64%"></span></i><em>64%</em></div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===== comment ça marche — mosaïque à illustrations glossy ===== -->
+  <section class="how" id="how">
+    <div class="bento-head reveal">
+      <span class="bh-kicker">De l'idée à l'APK</span>
+      <h2 class="bh-title">En trois étapes</h2>
+      <p class="section-sub">Pas d'Android Studio, pas de SDK — le cloud s'occupe de tout.</p>
+    </div>
+
+    <div class="how-grid">
+      <!-- 1 · décris ou importe : prompteur géant glossy -->
+      <article class="hcard hg-a reveal">
+        <h3>1 · Décris ou importe</h3>
+        <div class="hg-a-viz" aria-hidden="true">
+          <i class="ring r1"></i><i class="ring r2"></i>
+          <div class="giant-prompt">
+            <span class="gp-text">une app de recettes…<span class="caret dark"></span></span>
+            <span class="gp-go"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V6"/><path d="M6 12l6-7 6 7"/></svg></span>
+          </div>
+          <div class="gp-chips"><span>URL</span><span>dossier</span><span>idée</span></div>
+        </div>
+      </article>
+
+      <!-- 2 · le cloud compile : courbe de progression -->
+      <article class="hcard hg-b reveal">
+        <h3>2 · Le cloud compile</h3>
+        <div class="hg-b-viz" aria-hidden="true">
+          <svg viewBox="0 0 300 190" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="curveFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="rgba(224,192,125,0.22)"/>
+                <stop offset="1" stop-color="rgba(224,192,125,0)"/>
+              </linearGradient>
+            </defs>
+            <path class="curve-fill" d="M10 168 C 120 166, 225 140, 292 18 L292 190 L10 190 Z" fill="url(#curveFill)" stroke="none"/>
+            <path class="curve-line" d="M10 168 C 120 166, 225 140, 292 18" fill="none"/>
+            <circle class="curve-dot" cx="10" cy="168" r="4.5"/>
+          </svg>
+          <span class="hg-b-note">suivi en direct, étape par étape</span>
+        </div>
+      </article>
+
+      <!-- 3 · installe : téléphone sous projecteur -->
+      <article class="hcard hg-c reveal">
+        <h3>3 · Installe sur Android</h3>
+        <div class="hg-c-stage" aria-hidden="true">
+          <i class="hg-c-light"></i>
+          <div class="giant-phone"><span class="gph-icon"><svg class="ic andro" viewBox="0 0 24 24"><path d="M5.5 16a6.5 6.5 0 0 1 13 0z"/><path d="M8 8.8 6.4 6.4M16 8.8l1.6-2.4"/><circle cx="9.7" cy="12.6" r="0.9" fill="currentColor" stroke="none"/><circle cx="14.3" cy="12.6" r="0.9" fill="currentColor" stroke="none"/></svg></span></div>
+          <i class="hg-c-floor"></i>
+        </div>
+      </article>
+
+      <!-- ~60 s : jauge circulaire -->
+      <article class="hcard hg-d reveal">
+        <div class="gauge" aria-hidden="true"><span>~60<em>s</em></span></div>
+        <p class="hcard-caption">De la demande à l'APK,<br/>environ une minute.</p>
+      </article>
+
+      <!-- bouton téléchargement incliné -->
+      <article class="hcard hg-e reveal">
+        <p class="hcard-caption">L'APK arrive prête à installer,<br/>sur n'importe quel appareil.</p>
+        <div class="tilt-btn" aria-hidden="true">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4"/><path d="M5 19h14"/></svg>
+          Télécharger l'APK
+        </div>
+      </article>
+    </div>
+
+    <div class="how-bracket reveal" aria-hidden="true"></div>
+    <p class="how-punch reveal">Décris, suis, installe : tout se passe dans une seule interface,<br class="br-lg"/>
+      sans aucun outil à installer sur ta machine.</p>
+  </section>
+
+  <!-- ===== génération par IA ===== -->
+  <section class="ia" id="ia">
+    <div class="ia-grid">
+      <div class="ia-text">
+        <div class="pill-badge reveal">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.4 9l-4.6 1.8L12 15.4l-1.8-4.6L5.6 9l4.6-1.4L12 3z"/></svg>
+          Propulsé par Claude
+        </div>
+        <h2 class="reveal">Pas encore de site ?<br/>Décris-le.</h2>
+        <p class="reveal">Écris ton idée dans le prompteur. Claude pose deux ou trois questions
+          pour préciser le périmètre, estime le coût <em>avant</em> de générer,
+          puis code l'app — et le build APK s'enchaîne tout seul.</p>
+        <ul class="ia-points reveal">
+          <li><svg class="ic" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg> Questions de clarification à choix, directement dans le prompteur</li>
+          <li><svg class="ic" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg> Budget de tokens vérifié avant et pendant la génération</li>
+          <li><svg class="ic" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg> Si c'est trop ambitieux : une version allégée est proposée</li>
+        </ul>
+        <a class="btn-gold reveal" href="/app">Essayer avec mon compte</a>
+      </div>
+      <!-- aperçu façon prompteur : questions de clarification -->
+      <div class="ia-visual reveal" aria-hidden="true">
+        <div class="iv-desc">« une liste de courses avec catégories et totaux »</div>
+        <div class="iv-q">
+          <span class="iv-label">Apparence visuelle</span>
+          <span class="iv-opts">
+            <span class="iv-opt sel">Minimaliste</span><span class="iv-opt">Colorée</span><span class="iv-opt">Dark mode</span>
+          </span>
+        </div>
+        <div class="iv-q">
+          <span class="iv-label">Fonctionnalités</span>
+          <span class="iv-opts">
+            <span class="iv-opt">Simple</span><span class="iv-opt sel">Avec sauvegarde locale</span>
+          </span>
+        </div>
+        <div class="iv-meter">
+          <span>~700 tokens estimés · limite 5000</span>
+          <span class="iv-track"><span style="width:14%"></span></span>
+        </div>
+        <div class="iv-go">Lancer la génération</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FAQ ===== -->
+  <section class="faq" id="faq">
+    <h2 class="reveal">Questions fréquentes</h2>
+    <details class="reveal">
+      <summary>Faut-il un compte pour builder ?</summary>
+      <p>Non. Sans compte, tout fonctionne et l'historique reste dans ton navigateur.
+      Un compte Google ajoute un historique privé synchronisé et débloque la génération d'app par IA.</p>
+    </details>
+    <details class="reveal">
+      <summary>Combien de temps prend un build ?</summary>
+      <p>Environ une minute une fois le workflow démarré. Tu suis la progression étape par étape, en direct.</p>
+    </details>
+    <details class="reveal">
+      <summary>Mon projet web doit-il être en ligne ?</summary>
+      <p>Non. Tu peux glisser un dossier <code>dist/</code> ou un .zip contenant un <code>index.html</code> :
+      il est embarqué dans l'APK et l'app fonctionne entièrement hors-ligne.</p>
+    </details>
+    <details class="reveal">
+      <summary>Quel type d'APK est produit ?</summary>
+      <p>Une APK de debug, installable immédiatement sur tout appareil Android
+      (en autorisant les sources inconnues). Idéale pour tester, partager et itérer.</p>
+    </details>
+    <details class="reveal">
+      <summary>La génération par IA est-elle limitée ?</summary>
+      <p>Oui, volontairement : la consommation est estimée avant de générer et plafonnée pendant.
+      Si ta description est trop ambitieuse, une version allégée t'est proposée.</p>
+    </details>
+  </section>
+
+  <!-- ===== appel final ===== -->
+  <section class="cta-final">
+    <h2 class="reveal">On build quoi aujourd'hui ?</h2>
+    <a class="btn-gold big reveal" href="/app">Ouvrir le studio</a>
+  </section>
+
+  <footer class="footer">
+    <span class="footer-brand">
+      <svg class="ic" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+      APK Builder
+    </span>
+    <span class="footer-note">URL · projet web · idée → APK Android</span>
+  </footer>
+
+<script>
+  // Effet "prompt qui se tape tout seul" dans le héro.
+  (() => {
+    const samples = [
+      "https://mon-site.fr",
+      "mon-projet/dist (glisser-déposer)",
+      "une liste de courses avec catégories et totaux",
+      "un minuteur pomodoro avec sons",
+    ];
+    const el = document.getElementById("typed");
+    let i = 0, pos = 0, deleting = false;
+    (function tick() {
+      const s = samples[i];
+      el.textContent = s.slice(0, pos);
+      let delay = deleting ? 28 : 55;
+      if (!deleting && pos === s.length) { deleting = true; delay = 1600; }
+      else if (deleting && pos === 0) { deleting = false; i = (i + 1) % samples.length; delay = 350; }
+      else pos += deleting ? -1 : 1;
+      setTimeout(tick, delay);
+    })();
+
+    // Apparition au défilement.
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+  })();
+</script>
+</body>
+</html>
