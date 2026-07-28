@@ -625,6 +625,10 @@ func (s *Server) handleThumb(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "id invalide")
 		return
 	}
+	if b, ok := s.store.Get(id); ok && !s.buildVisible(r, b) {
+		writeErr(w, http.StatusNotFound, "miniature indisponible")
+		return
+	}
 	path := filepath.Join(s.cfg.Thumbs, id+".png")
 	if _, err := os.Stat(path); err != nil {
 		writeErr(w, http.StatusNotFound, "miniature indisponible")
@@ -643,6 +647,11 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		writeErr(w, http.StatusInternalServerError, "streaming non supporté")
+		return
+	}
+
+	if b, ok := s.store.Get(id); !ok || !s.buildVisible(r, b) {
+		writeErr(w, http.StatusNotFound, "build introuvable")
 		return
 	}
 
@@ -683,7 +692,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDownloadAPK(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	b, ok := s.store.Get(id)
-	if !ok {
+	if !ok || !s.buildVisible(r, b) {
 		writeErr(w, http.StatusNotFound, "build introuvable")
 		return
 	}
