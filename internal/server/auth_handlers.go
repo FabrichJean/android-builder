@@ -2,6 +2,12 @@ package server
 
 import "net/http"
 
+// postLoginNextCookie porte l'intention "l'utilisateur voulait ouvrir la
+// génération IA" à travers l'aller-retour OAuth (login -> Google -> callback).
+// Non sensible (juste un hint d'UI), donc un cookie simple suffit — pas besoin
+// du mécanisme de signature utilisé pour la session.
+const postLoginNextCookie = "post_login_next"
+
 // currentUserID renvoie l'ID Google de la session en cours, ou "" si anonyme.
 func (s *Server) currentUserID(r *http.Request) string {
 	u, ok := s.auth.UserFromRequest(r)
@@ -39,6 +45,15 @@ func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "connexion Google non configurée")
 		return
 	}
+	// Intention "ouvrir la génération IA après connexion" (ex. clic sur
+	// "Générer par IA" en anonyme) : conservée le temps de l'aller-retour
+	// OAuth via un cookie court, pour rallumer le bouton au retour.
+	if r.URL.Query().Get("next") == "gen" {
+		http.SetCookie(w, &http.Cookie{
+			Name: postLoginNextCookie, Value: "gen", Path: "/", HttpOnly: true,
+			SameSite: http.SameSiteLaxMode, MaxAge: 600,
+		})
+	}
 	url, err := s.auth.BeginLogin(w)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -72,7 +87,15 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Retour direct dans le studio (la racine est la landing marketing).
-	http.Redirect(w, r, "/app", http.StatusFound)
+	next := "/app"
+	if c, err := r.Cookie(postLoginNextCookie); err == nil && c.Value == "gen" {
+		http.SetCookie(w, &http.Cookie{
+			Name: postLoginNextCookie, Value: "", Path: "/", HttpOnly: true,
+			SameSite: http.SameSiteLaxMode, MaxAge: -1,
+		})
+		next = "/app?gen=1"
+	}
+	http.Redirect(w, r, next, http.StatusFound)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
