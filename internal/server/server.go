@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/example/android-builder/internal/appgen"
 	"github.com/example/android-builder/internal/auth"
 	"github.com/example/android-builder/internal/buildstore"
 	"github.com/example/android-builder/internal/config"
@@ -20,18 +21,19 @@ type Server struct {
 	gh     *ghclient.Client
 	store  *buildstore.Store
 	auth   *auth.Manager
+	gen    *appgen.Manager
 	log    *slog.Logger
 	chrome string        // binaire Chrome pour les miniatures ("" si absent)
 	sem    chan struct{} // limite les captures Chrome concurrentes
 }
 
-func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, authMgr *auth.Manager, log *slog.Logger) *Server {
+func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, authMgr *auth.Manager, genMgr *appgen.Manager, log *slog.Logger) *Server {
 	chrome := thumb.ChromePath()
 	if chrome == "" {
 		log.Warn("Chrome introuvable — miniatures désactivées (installe Chrome ou définis CHROME_PATH)")
 	}
 	return &Server{
-		cfg: cfg, gh: gh, store: store, auth: authMgr, log: log,
+		cfg: cfg, gh: gh, store: store, auth: authMgr, gen: genMgr, log: log,
 		chrome: chrome,
 		sem:    make(chan struct{}, 2),
 	}
@@ -48,20 +50,30 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/builds/{id}/thumb", s.handleThumb)
 	mux.HandleFunc("GET /api/builds", s.handleListBuilds)
 	mux.HandleFunc("GET /api/me", s.handleMe)
+	// Génération d'app par IA (CLI claude du serveur) — comptes connectés uniquement.
+	mux.HandleFunc("POST /api/generate", s.handleGenPrepare)
+	mux.HandleFunc("POST /api/generate/{id}/answers", s.handleGenAnswers)
+	mux.HandleFunc("GET /api/generate/{id}/events", s.handleGenEvents)
+	mux.HandleFunc("GET /api/generate/{id}/dist.zip", s.handleGenZip)
 	mux.HandleFunc("GET /auth/google/login", s.handleGoogleLogin)
 	mux.HandleFunc("GET /auth/google/callback", s.handleGoogleCallback)
 	mux.HandleFunc("POST /auth/logout", s.handleLogout)
-	// Vraie route "/historique" (au lieu d'un simple bascule JS) : rechargement,
-	// retour arrière et lien direct pointent vers la même page index.html, qui
-	// lit ensuite location.pathname pour afficher la bonne vue.
+	// Landing page marketing sur la racine exacte ; le studio vit sur /app
+	// et /historique (même index.html, la vue est choisie via location.pathname).
+	mux.HandleFunc("GET /{$}", s.handleLanding)
+	mux.HandleFunc("GET /app", s.handleIndexPage)
 	mux.HandleFunc("GET /historique", s.handleIndexPage)
-	// Interface web statique (index.html embarqué) sur toutes les autres routes.
+	// Assets statiques (style.css, app.js, landing.css…) sur les autres routes.
 	mux.Handle("GET /", http.FileServerFS(webui.FS()))
 	return mux
 }
 
-// handleIndexPage sert la même page index.html que "/" — utilisé pour que
-// "/historique" soit une vraie URL navigable (rechargement, retour arrière).
+func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
+	http.ServeFileFS(w, r, webui.FS(), "landing.html")
+}
+
+// handleIndexPage sert la page du studio — /app et /historique sont de vraies
+// URL navigables (rechargement, retour arrière) rendues par le même index.html.
 func (s *Server) handleIndexPage(w http.ResponseWriter, r *http.Request) {
 	http.ServeFileFS(w, r, webui.FS(), "index.html")
 }
