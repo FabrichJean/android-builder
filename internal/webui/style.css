@@ -269,6 +269,10 @@
     background: linear-gradient(160deg, var(--sand), var(--sand-dim));
   }
   .pt-gen[hidden] { display: none; }
+  .pt-gen:disabled {
+    opacity: .45; cursor: not-allowed;
+    color: var(--muted); border-color: var(--border-2); background: transparent;
+  }
 
   /* panneau interactif de génération : questions, budget, progression */
   .gen-panel {
