@@ -717,7 +717,8 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur serveur");
       genSession = data;
-      if (data.status === "over_budget") renderGenOverBudget(data);
+      if (data.status === "rejected") renderGenRejected(data);
+      else if (data.status === "over_budget") renderGenOverBudget(data);
       else renderGenQuestions(data);
     } catch (err) {
       genReset();
@@ -839,6 +840,22 @@
       genReset();
       genStart();
     });
+  }
+
+  // Demande refusée par le filtre de sécurité du prompt parser (avant même
+  // l'estimation de tokens) : pas de suggestion allégée, ce n'est pas un
+  // problème de budget mais de contenu.
+  function renderGenRejected(s) {
+    genPanel.hidden = false;
+    genPanel.innerHTML = `
+      <div class="gen-over">
+        <div class="gen-over-title">Demande refusée</div>
+        <div class="gen-note">${esc(s.error || "Cette demande ne peut pas être générée.")}</div>
+      </div>
+      <div class="gen-actions">
+        <button type="button" class="btn-ghost" id="genCancel">Fermer</button>
+      </div>`;
+    $("genCancel").addEventListener("click", genReset);
   }
 
   // ---- connexion Google (optionnelle) : historique privé par compte ----

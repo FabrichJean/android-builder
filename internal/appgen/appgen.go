@@ -257,24 +257,9 @@ func (m *Manager) StartGenerate(id, userID string, answers map[string]string) er
 }
 
 func (m *Manager) generate(ctx context.Context, id, desc string, questions []Question, answers map[string]string) {
-	var sb strings.Builder
-	for _, q := range questions {
-		if a := strings.TrimSpace(answers[q.ID]); a != "" {
-			fmt.Fprintf(&sb, "- %s → %s\n", q.Label, a)
-		}
-	}
-
-	prompt := fmt.Sprintf(`Génère une mini web app en UN SEUL fichier index.html complet (CSS et JS inline), sans aucune dépendance externe (pas de CDN, pas de police distante), en français.
-Contraintes STRICTES :
-- Réponds UNIQUEMENT avec le document HTML : la réponse commence par <!doctype html> et se termine par </html>. Aucun texte avant ou après, pas de bloc markdown.
-- Code compact : vise le minimum de tokens tout en restant lisible. Pas de commentaires superflus.
-- Adaptée mobile (meta viewport), utilisable hors-ligne.
-
-Description de l'app :
-%s
-
-Précisions choisies par l'utilisateur :
-%s`, desc, sb.String())
+	// Étapes 3-4 du prompt parser : réponses validées contre les options
+	// réellement proposées, puis assemblage du prompt final structuré.
+	prompt := buildPrompt(desc, questions, answers)
 
 	// Pousse la progression (tokens consommés) dans la session pendant le
 	// stream, pour que l'UI affiche un compteur en direct via SSE.
