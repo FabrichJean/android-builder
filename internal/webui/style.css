@@ -85,19 +85,20 @@
   .main { flex: 1; min-width: 0; overflow-y: auto; height: 100vh; }
   .view[hidden] { display: none; }
 
-  .anon-topbar {
-    display: flex; justify-content: flex-end; padding: 16px 28px;
-    position: sticky; top: 0; z-index: 20;
-    background: rgba(8,7,3,0.78); backdrop-filter: blur(8px);
-  }
+  /* Bouton flottant (pas une barre) : ancré au viewport, ne bouge pas au scroll,
+     ne prend aucune place dans le flux (contrairement à une bande pleine largeur). */
+  .anon-topbar { position: fixed; top: 20px; right: 20px; z-index: 40; }
   .anon-topbar[hidden] { display: none; }
   .anon-login-btn {
     display: flex; align-items: center; gap: 9px; text-align: left;
-    background: #16130c; border: 1px solid var(--border-2); color: var(--text);
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border-2); color: var(--text);
     font-family: inherit; font-size: 13px; font-weight: 600;
-    padding: 8px 14px; border-radius: 10px; cursor: pointer;
+    padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    box-shadow: 0 14px 34px -14px rgba(0,0,0,0.75);
+    transition: border-color .15s, background .15s;
   }
-  .anon-login-btn:hover { border-color: var(--sand); }
+  .anon-login-btn:hover { border-color: var(--sand); background: var(--surface-2); }
   .anon-login-btn .ic { width: 16px; height: 16px; flex: none; }
 
   /* réduite : ne garde que les icônes (aussi appliqué automatiquement en dessous
