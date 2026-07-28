@@ -135,3 +135,26 @@ func TestManualEndToEnd(t *testing.T) {
 		}
 	}
 }
+
+// TestManualAmbiguousRejection vérifie la posture "deny by default" : un
+// texte ambigu, ni clairement une app à construire ni une question absurde,
+// doit être refusé plutôt que d'être "sauvé" en app improvisée.
+func TestManualAmbiguousRejection(t *testing.T) {
+	if os.Getenv("APPGEN_MANUAL") != "1" {
+		t.Skip("test manuel (vraie invocation claude CLI) — définir APPGEN_MANUAL=1 pour l'exécuter")
+	}
+	bin, err := exec.LookPath("claude")
+	if err != nil {
+		t.Fatal("CLI claude introuvable")
+	}
+	m := New(bin, 5000, slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
+	s, err := m.Prepare(context.Background(), "user-test", "le café du matin sent toujours meilleur quand il pleut dehors")
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	t.Logf("status=%s error=%q", s.Status, s.Error)
+	if s.Status != StatusRejected {
+		t.Fatalf("statut attendu=%s, obtenu=%s (un texte ambigu aurait dû être refusé par défaut)", StatusRejected, s.Status)
+	}
+}
