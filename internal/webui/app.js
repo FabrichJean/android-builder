@@ -717,7 +717,8 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur serveur");
       genSession = data;
-      if (data.status === "rejected") renderGenRejected(data);
+      if (data.status === "banned") renderGenBanned(data);
+      else if (data.status === "rejected") renderGenRejected(data);
       else if (data.status === "over_budget") renderGenOverBudget(data);
       else renderGenQuestions(data);
     } catch (err) {
@@ -858,6 +859,23 @@
     $("genCancel").addEventListener("click", genReset);
   }
 
+  // Compte banni de la génération IA (trop de demandes refusées) : le bouton
+  // est désactivé pour la suite de la session, pas de nouvelle tentative.
+  function renderGenBanned(s) {
+    genPanel.hidden = false;
+    genPanel.innerHTML = `
+      <div class="gen-over">
+        <div class="gen-over-title">Compte banni de la génération IA</div>
+        <div class="gen-note">${esc(s.error || "Ce compte a dépassé la limite de demandes refusées.")}</div>
+      </div>
+      <div class="gen-actions">
+        <button type="button" class="btn-ghost" id="genCancel">Fermer</button>
+      </div>`;
+    $("genCancel").addEventListener("click", genReset);
+    genToggle.disabled = true;
+    genToggle.title = "Génération IA désactivée pour ce compte (trop de demandes refusées)";
+  }
+
   // ---- connexion Google (optionnelle) : historique privé par compte ----
   async function loadServerHistory() {
     try {
@@ -900,7 +918,7 @@
       $("accountUser").hidden = false;
       $("accountName").textContent = data.user.name || data.user.email || "Compte";
       setAvatar(data.user);
-      setLoggedInMode(!!data.gen);
+      setLoggedInMode(!!data.gen, !!data.gen_banned);
       await loadServerHistory();
     } catch {
       // API indisponible : on retombe sur le mode anonyme (historique local).
@@ -959,9 +977,14 @@
     switchView("home", false);
     renderRecent();
   }
-  function setLoggedInMode(genAvailable) {
+  function setLoggedInMode(genAvailable, genBanned) {
     persistLocal = false;
     genToggle.hidden = !genAvailable;
+    genToggle.disabled = !!genBanned;
+    genToggle.title = genBanned
+      ? "Génération IA désactivée pour ce compte (trop de demandes refusées)"
+      : "Décris ton app, Claude la génère sur le serveur";
+    if (genBanned) setGenMode(false);
     $("sidebar").hidden = false;
     $("anonTopbar").hidden = true;
     RECENT_COUNT = 6;
