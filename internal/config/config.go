@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -58,6 +59,10 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	SessionSecret      string // signe les cookies de session ; auto-généré si absent (sessions perdues au redémarrage)
+
+	// Génération d'app par IA (CLI claude du serveur, réservée aux comptes).
+	ClaudeBin     string // binaire du CLI claude (défaut: "claude" dans le PATH)
+	GenTokenLimit int    // plafond de tokens de sortie pour une génération
 }
 
 // Load lit la configuration depuis les variables d'environnement et valide
@@ -80,6 +85,8 @@ func Load() (*Config, error) {
 		GoogleClientID:     os.Getenv("GOOGLE_LOGIN_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_LOGIN_CLIENT_SECRET"),
 		SessionSecret:      os.Getenv("SESSION_SECRET"),
+		ClaudeBin:          env("CLAUDE_BIN", "claude"),
+		GenTokenLimit:      envInt("GEN_TOKEN_LIMIT", 5000),
 	}
 	if c.SessionSecret == "" {
 		// Pas fourni : on en génère un pour cette exécution (les sessions ne
@@ -109,6 +116,15 @@ func Load() (*Config, error) {
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
 	}
 	return def
 }
