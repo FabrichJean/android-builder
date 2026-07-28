@@ -2,7 +2,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $("form"), submit = $("submit"), formError = $("formError"), buildsEl = $("builds");
   const recentEl = $("recentBuilds");
-  const RECENT_COUNT = 6;
+  let RECENT_COUNT = 6;
   const STORE_KEY = "apk-builder-builds";
 
   const STATUS = {
@@ -705,19 +705,18 @@
     try {
       const res = await fetch("/api/me");
       const data = await res.json();
-      if (!data.enabled) return; // connexion Google non configurée : widget masqué
+      if (!data.enabled || !data.logged_in) { setAnonymousMode(data.enabled); return; }
       $("account").hidden = false;
-      if (data.logged_in) {
-        $("accountLogin").hidden = true;
-        $("accountUser").hidden = false;
-        $("accountName").textContent = data.user.name || data.user.email || "Compte";
-        setAvatar(data.user);
-        await loadServerHistory();
-      } else {
-        $("accountLogin").hidden = false;
-        $("accountUser").hidden = true;
-      }
-    } catch { /* API indisponible : on ignore, l'app reste utilisable sans compte */ }
+      $("accountLogin").hidden = true;
+      $("accountUser").hidden = false;
+      $("accountName").textContent = data.user.name || data.user.email || "Compte";
+      setAvatar(data.user);
+      setLoggedInMode();
+      await loadServerHistory();
+    } catch {
+      // API indisponible : on retombe sur le mode anonyme (historique local).
+      setAnonymousMode(false);
+    }
   }
   $("accountLogin").addEventListener("click", () => { location.href = "/auth/google/login"; });
 
@@ -738,18 +737,46 @@
     location.reload();
   });
 
-  // ---- sidebar : navigation Accueil/Historique + réduction ----
+  // ---- sidebar : navigation Accueil/Historique (vraies pages "/" et "/historique") ----
   const sbViews = { home: $("view-home"), history: $("view-history") };
-  function switchView(name) {
+  const VIEW_PATH = { home: "/", history: "/historique" };
+  function viewForPath(path) { return path === "/historique" ? "history" : "home"; }
+  function switchView(name, push = true) {
     document.querySelectorAll(".sb-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
     Object.entries(sbViews).forEach(([k, el]) => { el.hidden = k !== name; });
+    const path = VIEW_PATH[name] || "/";
+    if (push && location.pathname !== path) history.pushState({ view: name }, "", path);
   }
   document.querySelectorAll(".sb-item").forEach((btn) => {
     btn.addEventListener("click", () => switchView(btn.dataset.view));
   });
+  window.addEventListener("popstate", () => switchView(viewForPath(location.pathname), false));
   $("sbCollapse").addEventListener("click", () => {
     $("sidebar").classList.toggle("collapsed");
   });
+
+  // ---- mode anonyme (pas de compte) : pas de sidebar, tout sur une seule vue ----
+  // Sans sidebar, "/historique" n'est plus atteignable depuis l'UI : on affiche
+  // directement l'historique complet (local) sous le formulaire, sans limite.
+  function setAnonymousMode(canLogin) {
+    $("sidebar").hidden = true;
+    $("anonTopbar").hidden = !canLogin;
+    RECENT_COUNT = Infinity;
+    $("recentViewAll").hidden = true;
+    $("recentTitle").textContent = "Historique des builds";
+    switchView("home", false);
+    renderRecent();
+  }
+  function setLoggedInMode() {
+    $("sidebar").hidden = false;
+    $("anonTopbar").hidden = true;
+    RECENT_COUNT = 6;
+    $("recentViewAll").hidden = false;
+    $("recentTitle").textContent = "Builds récents";
+    switchView(viewForPath(location.pathname), false);
+    renderRecent();
+  }
+  $("anonLogin").addEventListener("click", () => { location.href = "/auth/google/login"; });
 
   // Reprise du suivi temps réel au chargement pour les builds non terminés.
   render();

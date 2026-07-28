@@ -62,6 +62,13 @@
     </aside>
 
     <main class="main">
+      <!-- pas de compte connecté : pas de sidebar, mais un accès discret à la connexion -->
+      <div class="anon-topbar" id="anonTopbar" hidden>
+        <button type="button" class="anon-login-btn" id="anonLogin">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M21.6 12.23c0-.7-.06-1.38-.18-2.03H12v3.84h5.4a4.62 4.62 0 0 1-2 3.03v2.5h3.24c1.9-1.75 2.96-4.32 2.96-7.34z" fill="#4285F4" stroke="none"/><path d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.5c-.9.6-2.05.96-3.4.96-2.6 0-4.8-1.76-5.6-4.12H3.06v2.58A10 10 0 0 0 12 22z" fill="#34A853" stroke="none"/><path d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.06a10 10 0 0 0 0 9l3.34-2.6z" fill="#FBBC05" stroke="none"/><path d="M12 5.98c1.47 0 2.79.5 3.82 1.5l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.94 5.5l3.34 2.6c.8-2.36 3-4.12 5.6-4.12z" fill="#EA4335" stroke="none"/></svg>
+          Se connecter avec Google
+        </button>
+      </div>
       <section class="view" id="view-home">
         <div class="hero">
           <div class="hero-inner">
@@ -226,7 +233,7 @@
         <div class="gallery">
           <div class="gallery-panel">
             <div class="gallery-head">
-              <h2 class="gallery-title">Builds récents</h2>
+              <h2 class="gallery-title" id="recentTitle">Builds récents</h2>
               <button type="button" class="recent-viewall" id="recentViewAll">
                 Tout voir
                 <svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>

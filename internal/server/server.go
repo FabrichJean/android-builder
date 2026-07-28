@@ -63,9 +63,19 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /auth/google/login", s.handleGoogleLogin)
 	mux.HandleFunc("GET /auth/google/callback", s.handleGoogleCallback)
 	mux.HandleFunc("POST /auth/logout", s.handleLogout)
+	// Vraie route "/historique" (au lieu d'un simple bascule JS) : rechargement,
+	// retour arrière et lien direct pointent vers la même page index.html, qui
+	// lit ensuite location.pathname pour afficher la bonne vue.
+	mux.HandleFunc("GET /historique", s.handleIndexPage)
 	// Interface web statique (index.html embarqué) sur toutes les autres routes.
 	mux.Handle("GET /", http.FileServerFS(webui.FS()))
 	return mux
+}
+
+// handleIndexPage sert la même page index.html que "/" — utilisé pour que
+// "/historique" soit une vraie URL navigable (rechargement, retour arrière).
+func (s *Server) handleIndexPage(w http.ResponseWriter, r *http.Request) {
+	http.ServeFileFS(w, r, webui.FS(), "index.html")
 }
 
 type createRequest struct {
@@ -567,11 +577,20 @@ func (s *Server) fail(id, msg string) {
 
 func (s *Server) handleGetBuild(w http.ResponseWriter, r *http.Request) {
 	b, ok := s.store.Get(r.PathValue("id"))
-	if !ok {
+	if !ok || !s.buildVisible(r, b) {
 		writeErr(w, http.StatusNotFound, "build introuvable")
 		return
 	}
 	writeJSON(w, http.StatusOK, b)
+}
+
+// buildVisible détermine si l'appelant peut accéder à un build donné : un
+// build anonyme (créé sans compte) reste accessible à qui connaît son ID
+// (c'est son seul mécanisme d'accès côté client), mais un build rattaché à
+// un compte ne doit être visible qu'à ce même compte — pas aux visiteurs
+// anonymes, ni aux autres comptes.
+func (s *Server) buildVisible(r *http.Request, b *buildstore.Build) bool {
+	return b.UserID == "" || b.UserID == s.currentUserID(r)
 }
 
 // captureThumb génère (en arrière-plan) la miniature d'un build via Chrome local.

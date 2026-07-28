@@ -50,6 +50,7 @@
     transition: width .2s ease;
   }
   .sidebar.collapsed { width: 72px; }
+  .sidebar[hidden] { display: none; }
 
   .sb-top { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 14px; }
   .sb-brand { display: flex; align-items: center; gap: 9px; color: var(--text); font-weight: 750; font-size: 15px; overflow: hidden; }
@@ -83,6 +84,17 @@
 
   .main { flex: 1; min-width: 0; overflow-y: auto; height: 100vh; }
   .view[hidden] { display: none; }
+
+  .anon-topbar { display: flex; justify-content: flex-end; padding: 16px 28px 0; }
+  .anon-topbar[hidden] { display: none; }
+  .anon-login-btn {
+    display: flex; align-items: center; gap: 9px; text-align: left;
+    background: #16130c; border: 1px solid var(--border-2); color: var(--text);
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    padding: 8px 14px; border-radius: 10px; cursor: pointer;
+  }
+  .anon-login-btn:hover { border-color: var(--sand); }
+  .anon-login-btn .ic { width: 16px; height: 16px; flex: none; }
 
   /* réduite : ne garde que les icônes (aussi appliqué automatiquement en dessous
      d'une certaine largeur, pour rester utilisable sur petit écran). */
@@ -422,6 +434,7 @@
     color: var(--sand); font-family: inherit; font-size: 13px; font-weight: 650;
   }
   .recent-viewall:hover { color: var(--sand-dim); }
+  .recent-viewall[hidden] { display: none; }
   .recent-viewall .ic { width: 14px; height: 14px; }
   .tabs { display: flex; gap: 4px; background: #100d08; border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
   .tab {
