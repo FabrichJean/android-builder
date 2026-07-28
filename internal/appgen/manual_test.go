@@ -43,6 +43,32 @@ func TestManualPromptRejection(t *testing.T) {
 	}
 }
 
+// TestManualOffTopicRejection vérifie qu'une demande inoffensive mais qui ne
+// décrit pas une app à construire (simple question, hors-sujet) est bien
+// refusée par le prompt parser, sans dépenser de tokens en estimation/génération.
+func TestManualOffTopicRejection(t *testing.T) {
+	if os.Getenv("APPGEN_MANUAL") != "1" {
+		t.Skip("test manuel (vraie invocation claude CLI) — définir APPGEN_MANUAL=1 pour l'exécuter")
+	}
+	bin, err := exec.LookPath("claude")
+	if err != nil {
+		t.Fatal("CLI claude introuvable")
+	}
+	m := New(bin, 5000, slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
+	s, err := m.Prepare(context.Background(), "user-test", "quelle est la capitale de la France, et pourquoi le ciel est bleu ?")
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	t.Logf("status=%s error=%q", s.Status, s.Error)
+	if s.Status != StatusRejected {
+		t.Fatalf("statut attendu=%s, obtenu=%s (une demande hors-sujet aurait dû être refusée)", StatusRejected, s.Status)
+	}
+	if s.Error == "" {
+		t.Fatal("aucune raison de refus renvoyée")
+	}
+}
+
 func TestManualEndToEnd(t *testing.T) {
 	if os.Getenv("APPGEN_MANUAL") != "1" {
 		t.Skip("test manuel (vraie invocation claude CLI) — définir APPGEN_MANUAL=1 pour l'exécuter")
