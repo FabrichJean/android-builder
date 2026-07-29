@@ -244,6 +244,9 @@
   .sidebar.collapsed .sb-item { justify-content: center; }
   .sidebar.collapsed .account-chip { justify-content: center; min-width: 0; padding: 7px; }
   .sidebar.collapsed .account-login { justify-content: center; padding: 9px; }
+  /* logo seul (le texte à côté est masqué ci-dessus) : centré et agrandi. */
+  .sidebar.collapsed .sb-top { justify-content: center; }
+  .sidebar.collapsed .brand-mark { width: 28px; height: 28px; }
   /* trop de contenu pour tenir en icône seule : masquée en réduit. */
   .sidebar.collapsed .sb-promo { display: none; }
   /* Réduite, la carte compte se résume à l'avatar : le badge en coin (pensé
@@ -264,6 +267,8 @@
     .sidebar:not(.expanded) .sb-item { justify-content: center; }
     .sidebar:not(.expanded) .account-chip { justify-content: center; min-width: 0; padding: 7px; }
     .sidebar:not(.expanded) .account-login { justify-content: center; padding: 9px; }
+    .sidebar:not(.expanded) .sb-top { justify-content: center; }
+    .sidebar:not(.expanded) .brand-mark { width: 28px; height: 28px; }
     .sidebar:not(.expanded) .sb-promo { display: none; }
     .sidebar:not(.expanded) .theme-toggle--corner { display: none; }
     .sidebar:not(.expanded) .sb-collapse .ic { transform: rotate(180deg); }
