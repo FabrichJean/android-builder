@@ -283,17 +283,40 @@ const SUGGESTED_BRANDS_POOL = [
   "framer.com", "loom.com", "calendly.com", "intercom.com",
   "codepen.io", "glitch.com", "vercel.com", "netlify.com",
   "railway.app", "supabase.com", "postman.com", "raindrop.io",
+  "hubspot.com", "mailchimp.com", "zendesk.com", "freshdesk.com",
+  "pipedrive.com", "gitlab.com", "bitbucket.org", "replit.com",
+  "sketch.com", "invisionapp.com", "zeplin.io", "superhuman.com",
+  "milanote.com", "workflowy.com", "bear.app", "roamresearch.com",
+  "logseq.com", "anytype.io", "convertkit.com", "activecampaign.com",
+  "drip.com", "front.com", "helpscout.com", "freshbooks.com",
+  "waveapps.com", "xero.com", "wise.com", "revolut.com",
+  "monzo.com", "plaid.com", "stripe.com", "twilio.com",
+  "sendgrid.com", "algolia.com", "digitalocean.com", "heroku.com",
+  "fly.io", "prisma.io", "hasura.io", "contentful.com",
+  "sanity.io", "strapi.io", "ghost.org", "substack.com",
+  "mailerlite.com", "beehiiv.com", "gumroad.com", "patreon.com",
+  "buymeacoffee.com", "pitch.com", "gamma.app", "tally.so",
+  "jotform.com", "descript.com", "riverside.fm", "streamyard.com",
+  "circle.so", "teachable.com", "thinkific.com", "skillshare.com",
 ];
 const SUGGESTIONS_SHOWN = 16;
-let shownBrands = pickBrands();
-function pickBrands() {
-  const pool = [...SUGGESTED_BRANDS_POOL];
-  for (let i = pool.length - 1; i > 0; i--) {
+function shuffled(arr) {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+    [out[i], out[j]] = [out[j], out[i]];
   }
-  return pool.slice(0, SUGGESTIONS_SHOWN);
+  return out;
 }
+// Évite les répétitions immédiates : pioche d'abord parmi les marques pas
+// encore montrées, et ne retombe sur le pool complet qu'une fois épuisé.
+function pickBrands() {
+  const fresh = SUGGESTED_BRANDS_POOL.filter((d) => !shownBrands.includes(d));
+  const source = fresh.length >= SUGGESTIONS_SHOWN ? fresh : SUGGESTED_BRANDS_POOL;
+  return shuffled(source).slice(0, SUGGESTIONS_SHOWN);
+}
+let shownBrands = [];
+shownBrands = pickBrands();
 function deselectIconSuggestion() {
   const sel = iconSuggestions.querySelector(".selected");
   if (sel) sel.classList.remove("selected");
