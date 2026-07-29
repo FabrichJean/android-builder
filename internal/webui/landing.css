@@ -38,6 +38,13 @@ code {
   stroke-linecap: round; stroke-linejoin: round;
 }
 
+/* logo de la marque (icône générée) : remplace l'ancien mark vectoriel */
+.brand-mark {
+  width: 1.2em; height: 1.2em; flex: none;
+  border-radius: 24%; object-fit: cover;
+  vertical-align: -0.22em;
+}
+
 /* apparition au défilement */
 .reveal { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
 .reveal.in { opacity: 1; transform: none; }
