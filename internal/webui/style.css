@@ -901,9 +901,10 @@
   .icon-suggestion {
     width: 100%; aspect-ratio: 1; border-radius: 11px; border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    background: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+    background: #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
     transition: transform .15s, box-shadow .15s;
   }
+  :root[data-theme="light"] .icon-suggestion { background: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
   .icon-suggestion:hover { transform: translateY(-2px); }
   .icon-suggestion.selected { box-shadow: 0 0 0 2px var(--sand); }
   .icon-suggestion-img { max-width: 78%; max-height: 78%; object-fit: contain; }
