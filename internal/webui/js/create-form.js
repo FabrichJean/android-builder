@@ -235,6 +235,7 @@ $("cropOk").addEventListener("click", () => {
   iconPreview = prev.toDataURL("image/png");
   out.toBlob((blob) => { if (blob) setIcon(blob); }, "image/png");
   cropModal.classList.remove("open");
+  iconSource = "manual";
   deselectIconSuggestion();
 });
 
@@ -290,6 +291,7 @@ iconSuggestions.addEventListener("click", async (e) => {
   if (!btn) return;
   try {
     await applyLogoURL(logoDevURL(btn.dataset.domain));
+    iconSource = "manual";
     deselectIconSuggestion();
     btn.classList.add("selected");
   } catch {
@@ -318,6 +320,7 @@ iconBrandApply.addEventListener("click", async () => {
   if (!iconBrandImg.src) return;
   try {
     await applyLogoURL(iconBrandImg.src);
+    iconSource = "manual";
     deselectIconSuggestion();
   } catch {
     fail("Logo introuvable ou indisponible pour le moment.");
@@ -330,6 +333,21 @@ $("url").addEventListener("input", () => {
     iconBrandQuery.value = new URL($("url").value.trim()).hostname.replace(/^www\./, "");
     debounceBrandPreview();
   } catch { /* URL incomplète : on laisse la recherche telle quelle */ }
+});
+
+// ---- icône par défaut = logo du nom de l'app (tant qu'on reste en mode "auto") ----
+let nameIconTimer = null;
+$("name").addEventListener("input", () => {
+  if (iconSource !== "auto") return;
+  clearTimeout(nameIconTimer);
+  const name = $("name").value.trim();
+  if (name.length < 2) return;
+  nameIconTimer = setTimeout(() => {
+    if (iconSource !== "auto") return; // choix manuel entre-temps : on ne l'écrase pas
+    applyLogoURL(logoDevURL(`name/${encodeURIComponent(name)}`)).catch(() => {
+      // Pas de logo pour ce nom : on garde l'icône actuelle sans afficher d'erreur.
+    });
+  }, 500);
 });
 
 syncSplash(); updatePreview();
