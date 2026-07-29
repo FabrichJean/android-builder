@@ -142,11 +142,9 @@
 
   .sb-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
 
-  /* pied de sidebar (compte + thème) : plaqué en bas via margin-top:auto sur
-     le flex column de .sidebar, séparé de la nav par un filet. */
-  .sb-footer { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border-2); }
   /* position: relative ancre le bouton thème en coin (.theme-toggle--corner) ;
      margin-top laisse la place à son débordement au-dessus de la carte. */
+  .account { margin-top: 8px; margin-bottom: 4px; }
   .account-card { position: relative; margin-top: 8px; }
   .sb-item {
     display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
@@ -282,11 +280,8 @@
   .account-credits-badge .ic { width: 12px; height: 12px; }
   .account-credits-badge.empty { color: var(--err); border-color: rgba(221,139,120,0.4); }
 
-  /* Le compte vit maintenant en pied de sidebar : le menu s'ouvre vers le
-     haut (bottom: 100%) pour rester dans la fenêtre plutôt que de déborder
-     sous le viewport. */
   .account-menu {
-    position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 7;
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 7;
     background: linear-gradient(180deg, var(--surface), var(--surface-2));
     border: 1px solid var(--border-2); border-radius: 12px; padding: 6px;
     box-shadow: var(--shadow); animation: pop .16s ease;
