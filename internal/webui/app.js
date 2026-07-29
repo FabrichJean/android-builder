@@ -9,6 +9,7 @@ import { initAccount } from "./js/account.js";
 import "./js/router.js";
 import "./js/create-form.js";
 import "./js/gen.js";
+import "./js/theme.js";
 
 // Reprise du suivi temps réel au chargement pour les builds non terminés.
 render();
