@@ -14,6 +14,7 @@
   --nav-bg:    rgba(8, 7, 3, 0.8);
   --well:      rgba(16, 13, 8, 0.85);
   --chip-bg:   rgba(8, 7, 3, 0.5);
+  --section-flat: #000000;
 }
 
 /* ---- thème clair (bascule manuelle, voir js/theme.js) ---- */
@@ -32,6 +33,7 @@
   --nav-bg:    rgba(247, 243, 234, 0.82);
   --well:      rgba(255, 253, 248, 0.9);
   --chip-bg:   rgba(255, 253, 248, 0.7);
+  --section-flat: #ffffff;
 }
 
 * { box-sizing: border-box; }
@@ -190,6 +192,7 @@ code {
 
 /* ===== sections communes ===== */
 .features, .how, .faq { padding: clamp(60px, 8vw, 100px) 20px; }
+.features, .how { background: var(--section-flat); }
 .features h2, .how h2, .faq h2, .cta-final h2 {
   text-align: center; font-size: clamp(26px, 4vw, 38px); font-weight: 800;
 }
@@ -377,11 +380,6 @@ code {
 .mp-track em { font-style: normal; font-size: 11px; color: var(--faint); }
 
 /* ===== comment ça marche — mosaïque à illustrations glossy ===== */
-.how {
-  background:
-    radial-gradient(800px 400px at 50% 0%, rgba(224,192,125,0.07), transparent 60%),
-    var(--bg);
-}
 .how-grid {
   display: grid; gap: 16px;
   grid-template-columns: 0.8fr 1fr 1fr 1fr;
