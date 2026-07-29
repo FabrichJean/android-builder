@@ -6,6 +6,7 @@ import { $, esc } from "./core.js";
 // fichier) : sûre car aucun de ces exports n'est utilisé à l'évaluation du
 // module, seulement à l'intérieur de gestionnaires d'événements.
 import { getMode, clearDist, setDist, updatePreview, fail } from "./create-form.js";
+import { refreshAccountCredits } from "./account.js";
 
 const genPanel = $("genPanel"), genToggle = $("genToggle");
 let genMode = false, genBusy = false, genSession = null, genES = null;
@@ -54,9 +55,11 @@ export async function genStart() {
     if (!res.ok) throw new Error(data.error || "Erreur serveur");
     genSession = data;
     if (data.status === "banned") renderGenBanned(data);
+    else if (data.status === "no_credits") renderGenNoCredits(data);
     else if (data.status === "rejected") renderGenRejected(data);
     else if (data.status === "over_budget") renderGenOverBudget(data);
     else renderGenQuestions(data);
+    refreshAccountCredits();
   } catch (err) {
     genReset();
     fail(err.message);
@@ -73,9 +76,12 @@ function renderGenQuestions(s) {
         `<button type="button" class="gq-opt" data-val="${esc(o)}">${esc(o)}</button>`).join("")}
       </div>
     </div>`).join("");
+  const creditsNote = s.credits_remaining != null
+    ? ` · crédits restants aujourd'hui : ~${s.credits_remaining} tokens`
+    : "";
   genPanel.innerHTML = `
     ${qs}
-    <div class="gen-note">Consommation estimée : ~${s.estimated_tokens || "?"} tokens (limite ${s.token_limit}).</div>
+    <div class="gen-note">Consommation estimée : ~${s.estimated_tokens || "?"} tokens (limite ${s.token_limit}${creditsNote}).</div>
     <div class="gen-actions">
       <button type="button" class="btn-ghost" id="genCancel">Annuler</button>
       <button type="button" class="btn-gold" id="genGo" disabled>Lancer la génération</button>
@@ -135,6 +141,7 @@ function genSubscribe(id) {
     if (s.status === "success") await genFinish(s);
     else if (s.status === "over_budget") renderGenOverBudget(s);
     else { genReset(); fail(s.error || "Génération échouée."); }
+    refreshAccountCredits();
   };
 }
 
@@ -210,4 +217,20 @@ function renderGenBanned(s) {
   $("genCancel").addEventListener("click", genReset);
   genToggle.disabled = true;
   genToggle.title = "Génération IA désactivée pour ce compte (trop de demandes refusées)";
+}
+
+// Crédits journaliers épuisés (5 crédits = 5000 tokens/jour, remis à zéro le
+// lendemain) : le bouton reste actif, la limite se lève automatiquement au
+// jour suivant.
+function renderGenNoCredits(s) {
+  genPanel.hidden = false;
+  genPanel.innerHTML = `
+    <div class="gen-over">
+      <div class="gen-over-title">Crédits de génération épuisés</div>
+      <div class="gen-note">${esc(s.error || "Tu as utilisé tous tes crédits de génération pour aujourd'hui. Reviens demain.")}</div>
+    </div>
+    <div class="gen-actions">
+      <button type="button" class="btn-ghost" id="genCancel">Fermer</button>
+    </div>`;
+  $("genCancel").addEventListener("click", genReset);
 }
