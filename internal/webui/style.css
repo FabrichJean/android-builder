@@ -258,6 +258,39 @@
     color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600;
   }
   .account-menu-item:hover { background: rgba(221,139,120,0.12); color: var(--err); }
+
+  /* ---- crédits IA (menu du compte) : 5 crédits/jour = 5000 tokens, remis à
+     zéro chaque nuit ; affiché avec une jauge + une explication courte. ---- */
+  .account-credits[hidden] { display: none; }
+  .account-credits {
+    padding: 10px 10px 11px; margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-2);
+  }
+  .account-credits-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    margin-bottom: 7px;
+  }
+  .account-credits-label {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--faint);
+  }
+  .account-credits-count {
+    font-size: 13px; font-weight: 700; color: var(--sand);
+  }
+  .account-credits-track {
+    height: 6px; border-radius: 4px; background: var(--well);
+    border: 1px solid var(--border-2); overflow: hidden;
+  }
+  .account-credits-fill {
+    display: block; height: 100%; border-radius: 4px;
+    background: var(--gold-grad, var(--sand));
+    transition: width .25s ease;
+  }
+  .account-credits-track.empty .account-credits-fill { background: var(--err); }
+  .account-credits-note {
+    margin: 8px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--faint);
+  }
+  .account-credits-note strong { color: var(--text); font-weight: 650; }
   .pill-badge {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: 12.5px; font-weight: 600; color: var(--sand);
