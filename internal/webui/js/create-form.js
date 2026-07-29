@@ -235,34 +235,50 @@ $("cropOk").addEventListener("click", () => {
   deselectIconSuggestion();
 });
 
-// ---- galerie de suggestions d'icône (générées : dégradé + initiale) ----
+// ---- galerie de suggestions d'icône (pictogrammes réels sur fond dégradé) ----
 const iconSuggestions = $("iconSuggestions");
-const ICON_HUES = [18, 48, 95, 150, 190, 230, 275, 320];
+// Glyphes ligne (style Feather, viewBox 24x24) — mêmes conventions que ICONS
+// dans core.js (stroke, pas de remplissage), un par teinte de dégradé.
+const ICON_SUGGESTIONS = [
+  { hue: 18,  d: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" }, // musique
+  { hue: 48,  d: "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M15.2 13a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0z" }, // caméra
+  { hue: 95,  d: "M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" }, // panier
+  { hue: 150, d: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" }, // cœur
+  { hue: 190, d: "M21 11.5a8.4 8.4 0 0 1-8.5 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.4 8.4 0 0 1 12.5 3a8.5 8.5 0 0 1 8.5 8.5z" }, // chat
+  { hue: 230, d: "M13 2 3 14h7l-1 8 11-14h-7z" }, // éclair
+  { hue: 275, d: "M12 2l2.9 6.9 7.4.6-5.6 4.9 1.7 7.3L12 17.9 5.6 21.7l1.7-7.3L1.7 9.5l7.4-.6L12 2z" }, // étoile
+  { hue: 320, d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }, // livre
+];
+function iconBg(hue) {
+  return `linear-gradient(150deg,hsl(${hue},55%,55%),hsl(${(hue + 40) % 360},60%,32%))`;
+}
 function deselectIconSuggestion() {
   const sel = iconSuggestions.querySelector(".selected");
   if (sel) sel.classList.remove("selected");
 }
 function renderIconSuggestions() {
-  const letter = ($("name").value.trim()[0] || "A").toUpperCase();
-  iconSuggestions.innerHTML = ICON_HUES.map(h => `
-    <button type="button" class="icon-suggestion" data-hue="${h}" title="Utiliser cette icône"
-      style="background:linear-gradient(150deg,hsl(${h},55%,55%),hsl(${(h + 40) % 360},60%,32%))"
-      >${letter}</button>`).join("");
+  iconSuggestions.innerHTML = ICON_SUGGESTIONS.map((s, i) => `
+    <button type="button" class="icon-suggestion" data-i="${i}" title="Utiliser cette icône"
+      style="background:${iconBg(s.hue)}">
+      <svg class="icon-suggestion-svg" viewBox="0 0 24 24"><path d="${s.d}"/></svg>
+    </button>`).join("");
 }
 function applyIconSuggestion(btn) {
-  const hue = +btn.dataset.hue;
-  const letter = ($("name").value.trim()[0] || "A").toUpperCase();
+  const s = ICON_SUGGESTIONS[+btn.dataset.i];
   const size = 512;
   const c = document.createElement("canvas"); c.width = c.height = size;
   const ictx = c.getContext("2d");
   const grad = ictx.createLinearGradient(0, 0, size, size);
-  grad.addColorStop(0, `hsl(${hue},55%,55%)`);
-  grad.addColorStop(1, `hsl(${(hue + 40) % 360},60%,32%)`);
+  grad.addColorStop(0, `hsl(${s.hue},55%,55%)`);
+  grad.addColorStop(1, `hsl(${(s.hue + 40) % 360},60%,32%)`);
   ictx.fillStyle = grad; ictx.fillRect(0, 0, size, size);
-  ictx.fillStyle = "rgba(255,255,255,.92)";
-  ictx.font = `700 ${size * 0.52}px system-ui, sans-serif`;
-  ictx.textAlign = "center"; ictx.textBaseline = "middle";
-  ictx.fillText(letter, size / 2, size / 2 + size * 0.03);
+  // Glyphe centré, avec une marge (comme la zone de sécurité d'une icône adaptative).
+  const scale = (size * 0.56) / 24;
+  ictx.translate((size - 24 * scale) / 2, (size - 24 * scale) / 2);
+  ictx.scale(scale, scale);
+  ictx.strokeStyle = "rgba(255,255,255,.92)";
+  ictx.lineWidth = 2; ictx.lineCap = "round"; ictx.lineJoin = "round";
+  ictx.stroke(new Path2D(s.d));
   const prev = document.createElement("canvas"); prev.width = prev.height = 128;
   prev.getContext("2d").drawImage(c, 0, 0, 128, 128);
   iconPreview = prev.toDataURL("image/png");
@@ -274,7 +290,6 @@ iconSuggestions.addEventListener("click", (e) => {
   const btn = e.target.closest(".icon-suggestion");
   if (btn) applyIconSuggestion(btn);
 });
-$("name").addEventListener("input", renderIconSuggestions);
 renderIconSuggestions();
 
 syncSplash(); updatePreview();
