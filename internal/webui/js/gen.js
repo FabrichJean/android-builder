@@ -15,6 +15,7 @@ let genMode = false, genBusy = false, genSession = null, genES = null;
 let genNeedsLogin = false;
 const URL_PLACEHOLDER = "https://exemple.com — ou glisse-dépose un dossier / .zip…";
 const GEN_PLACEHOLDER = "Décris l'app à générer (ex. une liste de courses avec catégories et totaux)…";
+const MIN_DESC_LEN = 10; // aligné sur le contrôle de genStart()
 
 export function isGenMode() { return genMode; }
 export function setGenNeedsLogin(v) { genNeedsLogin = v; }
@@ -32,14 +33,14 @@ genToggle.addEventListener("click", () => {
 });
 
 // Bascule automatique du mode génération IA selon le contenu du prompteur :
-// une URL désactive le mode IA, tout autre texte non vide l'active — sans
-// forcer l'utilisateur à cliquer le bouton lui-même.
+// une URL ou un texte trop court désactive le mode IA, tout autre texte
+// suffisant l'active — sans forcer l'utilisateur à cliquer le bouton lui-même.
 $("url").addEventListener("input", () => {
   if (genNeedsLogin || genToggle.hidden || genToggle.disabled) return;
   const desc = $("url").value.trim();
-  if (!desc) return;
   const isURL = /^https?:\/\//.test(desc);
-  if (isURL === genMode) setGenMode(!isURL);
+  const shouldBeOn = !isURL && desc.length >= MIN_DESC_LEN;
+  if (shouldBeOn !== genMode) setGenMode(shouldBeOn);
 });
 
 function genReset() {
