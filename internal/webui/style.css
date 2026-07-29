@@ -439,7 +439,9 @@
   .prompt-input:focus {
   outline: none; /* Supprime le contour natif */
   }
-  .prompt-box.has-project .prompt-input { opacity: .4; }
+  .prompt-box.has-project .prompt-input { display: none; }
+  .prompt-box #summarySection { margin: 14px 14px 0; }
+  .prompt-box #summarySection .section-label { margin-bottom: 8px; }
 
   .prompt-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px 10px; flex-wrap: wrap; }
   .pt-left { position: relative; display: flex; }

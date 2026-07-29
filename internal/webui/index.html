@@ -264,6 +264,28 @@
                 <form id="form" novalidate>
                   <!-- entrée unifiée : URL ou glisser-déposer, façon barre de prompt -->
                   <div class="prompt-box" id="dropZone">
+                    <!-- résumé de la source importée : remplace visuellement le prompteur en mode projet -->
+                    <div class="section" id="summarySection" hidden>
+                      <div class="section-label">Source</div>
+                      <div class="pb-project" id="projectRow">
+                        <svg class="ic pb-project-ic" viewBox="0 0 24 24">
+                          <path d="M21 8.5 12 4 3 8.5 12 13l9-4.5z" />
+                          <path d="M3 8.5v7L12 20l9-4.5v-7" />
+                          <path d="M12 13v7" />
+                        </svg>
+                        <span class="pb-project-name" id="projectName"></span>
+                        <button
+                          type="button"
+                          class="pb-project-clear"
+                          id="projectClear"
+                          title="Changer de source"
+                        >
+                          <svg class="ic" viewBox="0 0 24 24">
+                            <path d="M18 6 6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                     <textarea
                       id="url"
                       class="prompt-input"
@@ -363,29 +385,6 @@
                   <!-- panneau interactif de la génération IA : questions, budget tokens, progression -->
                   <div class="gen-panel" id="genPanel" hidden></div>
                   <div class="form-error" id="formError"></div>
-
-                  <!-- résumé de la source importée -->
-                  <div class="section" id="summarySection" hidden>
-                    <div class="section-label">Source</div>
-                    <div class="pb-project" id="projectRow">
-                      <svg class="ic pb-project-ic" viewBox="0 0 24 24">
-                        <path d="M21 8.5 12 4 3 8.5 12 13l9-4.5z" />
-                        <path d="M3 8.5v7L12 20l9-4.5v-7" />
-                        <path d="M12 13v7" />
-                      </svg>
-                      <span class="pb-project-name" id="projectName"></span>
-                      <button
-                        type="button"
-                        class="pb-project-clear"
-                        id="projectClear"
-                        title="Changer de source"
-                      >
-                        <svg class="ic" viewBox="0 0 24 24">
-                          <path d="M18 6 6 18M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
 
                   <!-- nom de l'app -->
                   <div class="section">
