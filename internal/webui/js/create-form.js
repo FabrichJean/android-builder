@@ -11,8 +11,30 @@ import { mb, processDistFiles, extractDistIcon } from "./zip.js";
 import { isGenMode, genStart } from "./gen.js";
 
 const form = $("form"), submit = $("submit"), formError = $("formError");
+const uploadProgress = $("uploadProgress"), uploadBar = $("uploadBar"), uploadPct = $("uploadPct");
 
 export function fail(msg) { formError.textContent = msg; }
+
+// fetch() n'expose pas la progression d'upload : XHR est nécessaire pour
+// suivre l'envoi du dist.zip (parfois volumineux) sur /api/builds.
+function postBuild(fd, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/builds");
+    if (onProgress) {
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      });
+    }
+    xhr.addEventListener("load", () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch { /* réponse non-JSON */ }
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, data });
+    });
+    xhr.addEventListener("error", () => reject(new Error("Erreur réseau pendant l'envoi.")));
+    xhr.send(fd);
+  });
+}
 
 // ---- panneau "Personnaliser" dépliable ----
 $("customToggle").addEventListener("click", (e) => {
@@ -49,25 +71,32 @@ form.addEventListener("submit", async (e) => {
   fd.append("picture_in_picture", $("pictureInPicture").checked ? "true" : "false");
   if (iconBlob) fd.append("icon", iconBlob, "icon.png");
 
-  let fetchOpts, listURL;
+  let listURL;
   if (mode === "bundle") {
     if (!distBlob) return fail("Choisis un dossier ou un .zip contenant index.html.");
     fd.append("dist", distBlob, "dist.zip");
-    fetchOpts = { method: "POST", body: fd };
     listURL = distName || "dist.zip";
   } else {
     const url = $("url").value.trim();
     if (!/^https?:\/\//.test(url)) return fail("L'URL doit commencer par http:// ou https://");
     fd.append("url", url);
-    fetchOpts = { method: "POST", body: fd };
     listURL = url;
   }
 
   submit.disabled = true;
+  const showProgress = mode === "bundle";
+  if (showProgress) {
+    uploadProgress.hidden = false;
+    uploadBar.style.width = "0%";
+    uploadPct.textContent = "0%";
+  }
   try {
-    const res = await fetch("/api/builds", fetchOpts);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Erreur serveur");
+    const { ok, data } = await postBuild(fd, showProgress ? (frac) => {
+      const pct = Math.round(frac * 100);
+      uploadBar.style.width = pct + "%";
+      uploadPct.textContent = pct + "%";
+    } : null);
+    if (!ok) throw new Error(data.error || "Erreur serveur");
 
     builds.unshift({
       id: data.id, status: data.status || "pending",
@@ -81,6 +110,7 @@ form.addEventListener("submit", async (e) => {
     fail(err.message);
   } finally {
     submit.disabled = false;
+    uploadProgress.hidden = true;
   }
 });
 
