@@ -269,11 +269,14 @@ async function applyLogoURL(url) {
   setIcon(blob);
 }
 
-// ---- galerie de suggestions : logos de marques connues, via logo.dev ----
+// ---- galerie de suggestions : logos de marques (volontairement moins
+// "grand public" que Google/Netflix/Instagram, pour varier les icônes) ----
 const iconSuggestions = $("iconSuggestions");
 const SUGGESTED_BRANDS = [
-  "google.com", "youtube.com", "spotify.com", "netflix.com",
-  "instagram.com", "discord.com", "twitch.tv", "whatsapp.com",
+  "notion.so", "figma.com", "linear.app", "trello.com",
+  "todoist.com", "airtable.com", "miro.com", "asana.com",
+  "clickup.com", "evernote.com", "pocket.com", "feedly.com",
+  "buffer.com", "dribbble.com", "behance.net", "vimeo.com",
 ];
 function deselectIconSuggestion() {
   const sel = iconSuggestions.querySelector(".selected");

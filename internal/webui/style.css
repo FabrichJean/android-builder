@@ -864,7 +864,7 @@
   .icon-picker:hover .icon-popover,
   .icon-popover:hover,
   .icon-popover:focus-within { opacity: 1; visibility: visible; transform: translateY(0); }
-  .icon-popover { width: 200px; }
+  .icon-popover { width: 380px; }
   .icon-popover-label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
   .icon-popover-label:not(:first-child) { margin-top: 12px; }
   .icon-brand-row input {
@@ -884,9 +884,9 @@
   .icon-popover-attrib { margin-top: 10px; text-align: center; }
   .icon-popover-attrib a { font-size: 10.5px; color: var(--faint); text-decoration: none; }
   .icon-popover-attrib a:hover { color: var(--muted); }
-  .icon-suggestions { display: grid; grid-template-columns: repeat(4, 40px); gap: 8px; }
+  .icon-suggestions { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
   .icon-suggestion {
-    width: 40px; height: 40px; border-radius: 11px; border: none; cursor: pointer;
+    width: 100%; aspect-ratio: 1; border-radius: 11px; border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     background: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
     transition: transform .15s, box-shadow .15s;
