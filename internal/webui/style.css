@@ -165,8 +165,8 @@
      margin-top:auto (dernier enfant du flex column de .sidebar). ---- */
   .sb-promo {
     margin-top: auto; position: relative; overflow: hidden;
-    border: 1px solid var(--border-2); border-radius: 14px;
-    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border-mute); border-radius: 14px;
+    background: var(--sidebar-bg);
   }
   .sb-promo[hidden] { display: none; }
   .sb-promo-close {
