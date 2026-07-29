@@ -988,7 +988,9 @@
     width: 38px; height: 38px; border-radius: 10px; flex: none;
     display: flex; align-items: center; justify-content: center;
     font-size: 15px; font-weight: 700; color: rgba(255,255,255,.92);
+    overflow: hidden;
   }
+  .command-row-icon img { width: 100%; height: 100%; object-fit: cover; }
   .command-row-text { flex: 1; min-width: 0; }
   .command-row-title {
     font-size: 13.5px; font-weight: 600; color: var(--text);

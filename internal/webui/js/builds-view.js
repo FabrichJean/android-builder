@@ -8,6 +8,10 @@ const recentEl = $("recentBuilds");
 const searchEl = $("search");
 
 let activeFilter = "all";
+// La barre de recherche de la sidebar est un simple déclencheur (readonly,
+// vidée en permanence) : le vrai texte saisi vit dans le modal ⌘K, l'état de
+// la recherche courante est gardé ici plutôt que dans son .value.
+let searchQuery = "";
 
 // Vignette : dégradé déterministe dérivé du nom + initiale.
 function thumbStyle(name) {
@@ -73,7 +77,7 @@ function card(b) {
 
 // Met à jour UNE carte en place (pastille + corps) sans recréer la vignette.
 function isVisible(b) {
-  const q = (searchEl && searchEl.value || "").trim().toLowerCase();
+  const q = searchQuery.trim().toLowerCase();
   return matchFilter(b) && (!q || `${b.app_name} ${b.url}`.toLowerCase().includes(q));
 }
 export function patch(b) {
@@ -152,7 +156,7 @@ $("activeToggle").addEventListener("click", () => {
 });
 
 export function render() {
-  const q = (searchEl && searchEl.value || "").trim().toLowerCase();
+  const q = searchQuery.trim().toLowerCase();
   const list = builds.filter(b => matchFilter(b) &&
     (!q || `${b.app_name} ${b.url}`.toLowerCase().includes(q)));
   if (!list.length) {
@@ -179,8 +183,6 @@ $("tabs").addEventListener("click", (e) => {
   [...$("tabs").children].forEach(t => t.classList.toggle("active", t.getAttribute("data-filter") === f));
   render();
 });
-searchEl.addEventListener("input", render);
-
 // ---- palette de recherche rapide (⌘K) : la barre de recherche de la
 // sidebar n'est plus qu'un déclencheur (readonly) — la saisie et les
 // résultats vivent dans ce modal, façon command palette. ----
@@ -196,8 +198,14 @@ function cmdMatches(query) {
 }
 function cmdRowHTML(b, i) {
   const initial = ((b.app_name || "?").trim()[0] || "?").toUpperCase();
+  // Reprend l'icône choisie à la création du build quand elle existe (upload,
+  // suggestion, logo de marque) plutôt que le dégradé + initiale générique.
+  const iconInner = b.icon
+    ? `<img src="${esc(b.icon)}" alt="" />`
+    : esc(initial);
+  const iconStyle = b.icon ? "" : ` style="${thumbStyle(b.app_name)}"`;
   return `<div class="command-row${i === cmdSelected ? " selected" : ""}" data-id="${b.id}" data-index="${i}">
-    <div class="command-row-icon" style="${thumbStyle(b.app_name)}">${esc(initial)}</div>
+    <div class="command-row-icon"${iconStyle}>${iconInner}</div>
     <div class="command-row-text">
       <div class="command-row-title">${esc(b.app_name)}</div>
       <div class="command-row-sub">${esc(b.url)}</div>
@@ -222,14 +230,13 @@ function openCmdModal() {
 }
 function closeCmdModal() {
   cmdModal.classList.remove("open");
-  searchEl.blur();
 }
 function selectCmdMatch(id) {
   const b = builds.find(x => x.id === id);
   closeCmdModal();
   if (!b) return;
   switchView("history");
-  searchEl.value = b.app_name;
+  searchQuery = b.app_name;
   render();
   requestAnimationFrame(() => {
     const card = buildsEl.querySelector(`.pcard[data-card="${id}"]`);
