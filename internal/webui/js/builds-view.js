@@ -180,3 +180,15 @@ $("tabs").addEventListener("click", (e) => {
   render();
 });
 searchEl.addEventListener("input", render);
+
+// Raccourci ⌘K / Ctrl+K : focus la recherche depuis n'importe où (sauf si on
+// tape déjà dans un autre champ), échap pour la relâcher.
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    searchEl.focus();
+    searchEl.select();
+  } else if (e.key === "Escape" && document.activeElement === searchEl) {
+    searchEl.blur();
+  }
+});
