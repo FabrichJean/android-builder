@@ -4,12 +4,17 @@ import { $ } from "./core.js";
 
 const KEY = "apk-builder-promo-dismissed";
 const promo = $("sbPromo");
+const close = $("sbPromoClose");
 
-try {
-  if (localStorage.getItem(KEY) === "1") promo.hidden = true;
-} catch { /* stockage indisponible : la carte reste visible */ }
+if (promo) {
+  try {
+    if (localStorage.getItem(KEY) === "1") promo.hidden = true;
+  } catch { /* stockage indisponible : la carte reste visible */ }
 
-$("sbPromoClose").addEventListener("click", () => {
-  promo.hidden = true;
-  try { localStorage.setItem(KEY, "1"); } catch {}
-});
+  if (close) {
+    close.addEventListener("click", () => {
+      promo.hidden = true;
+      try { localStorage.setItem(KEY, "1"); } catch {}
+    });
+  }
+}
