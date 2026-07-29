@@ -252,11 +252,13 @@
      détail (jauge + explication) reste dans le dropdown. */
   .account-credits-badge[hidden] { display: none; }
   .account-credits-badge {
-    flex: none; font-size: 11px; font-weight: 700; line-height: 1;
+    display: flex; align-items: center; gap: 3px; flex: none;
+    font-size: 11px; font-weight: 700; line-height: 1;
     color: var(--sand); background: var(--sand-soft);
     border: 1px solid var(--border-2); border-radius: 999px;
-    padding: 3px 7px;
+    padding: 3px 7px 3px 6px;
   }
+  .account-credits-badge .ic { width: 12px; height: 12px; }
   .account-credits-badge.empty { color: var(--err); border-color: rgba(221,139,120,0.4); }
 
   .account-menu {

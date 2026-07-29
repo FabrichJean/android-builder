@@ -32,9 +32,10 @@ function renderCredits(tokensRemaining, dailyBudget, creditsPerDay) {
   const creditsRemaining = Math.max(0, Math.min(creditsPerDay, Math.round(tokensRemaining / tokensPerCredit)));
   const pct = Math.max(0, Math.min(100, Math.round(tokensRemaining * 100 / dailyBudget)));
 
-  // Badge sur le chip (toujours visible, sans ouvrir le menu).
+  // Badge sur le chip (icône pièce + nombre restant, toujours visible sans
+  // ouvrir le menu — le détail complet reste dans le dropdown).
   badge.hidden = false;
-  badge.textContent = `${creditsRemaining}/${creditsPerDay}`;
+  $("accountCreditsBadgeCount").textContent = creditsRemaining;
   badge.classList.toggle("empty", tokensRemaining <= 0);
 
   // Détail (jauge + explication) : reste dans le dropdown existant.
