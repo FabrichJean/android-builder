@@ -20,6 +20,12 @@
        fond, pour la même raison en clair qu'en sombre. */
     --sidebar-bg: #0d0b06;
     --well:       #100d08;
+    /* look "glossy" partagé par tous les boutons dorés (même recette que le
+       prompteur géant de la landing) */
+    --gold-grad:   linear-gradient(165deg, #f6e3b0, var(--sand) 45%, #a8894f);
+    --gold-shadow: 0 10px 26px -10px rgba(224,192,125,0.55),
+                   inset 0 2px 3px rgba(255,255,255,0.5),
+                   inset 0 -6px 14px rgba(90,66,26,0.4);
   }
 
   /* ---- thème clair (bascule manuelle, voir js/theme.js) ---- */
@@ -314,7 +320,7 @@
   .pt-gen:hover { color: var(--sand); border-color: var(--sand); background: var(--sand-soft); }
   .pt-gen.active {
     color: #201a0e; border-color: transparent;
-    background: linear-gradient(160deg, var(--sand), var(--sand-dim));
+    background: var(--gold-grad); box-shadow: var(--gold-shadow);
   }
   .pt-gen[hidden] { display: none; }
   .pt-gen:disabled {
@@ -341,7 +347,7 @@
   .gq-opt:hover { color: var(--sand); border-color: var(--sand); }
   .gq-opt.selected {
     color: #201a0e; border-color: transparent;
-    background: linear-gradient(160deg, var(--sand), var(--sand-dim));
+    background: var(--gold-grad); box-shadow: var(--gold-shadow);
   }
   .gen-note { font-size: 12px; color: var(--faint); margin: 4px 0 10px; }
   .gen-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -369,9 +375,9 @@
   }
   .pt-submit {
     display: grid; place-items: center; width: 38px; height: 38px; flex: none;
-    background: linear-gradient(160deg, var(--sand), var(--sand-dim));
+    background: var(--gold-grad);
     color: #201a0e; border: none; border-radius: 50%; cursor: pointer;
-    box-shadow: 0 8px 22px -8px rgba(224,192,125,0.65);
+    box-shadow: var(--gold-shadow);
     transition: filter .15s, transform .08s;
   }
   .pt-submit:hover { filter: brightness(1.05); }
@@ -642,7 +648,7 @@
   button.submit {
     width: 100%; margin-top: 22px;
     display: flex; align-items: center; justify-content: center; gap: 9px;
-    background: linear-gradient(160deg, var(--sand), var(--sand-dim));
+    background: var(--gold-grad); box-shadow: var(--gold-shadow);
     color: #201a0e;
     font-size: 15px; font-weight: 650;
     border: none; border-radius: 11px;
@@ -766,7 +772,7 @@
   }
   .btn-ghost { background: transparent; border: 1px solid var(--border-2); color: var(--muted); }
   .btn-ghost:hover { color: var(--text); }
-  .btn-gold { background: linear-gradient(160deg, var(--sand), var(--sand-dim)); color: #201a0e; }
+  .btn-gold { background: var(--gold-grad); box-shadow: var(--gold-shadow); color: #201a0e; }
 
   /* ---- galerie de builds (cartes) ---- */
   .builds {
