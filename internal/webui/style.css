@@ -162,6 +162,7 @@
   .sidebar.collapsed .sb-item span,
   .sidebar.collapsed .account-name,
   .sidebar.collapsed .account-chev,
+  .sidebar.collapsed .account-credits-badge,
   .sidebar.collapsed .account-login span { display: none; }
   .sidebar.collapsed .sb-item { justify-content: center; }
   .sidebar.collapsed .account-chip { justify-content: center; min-width: 0; padding: 7px; }
@@ -174,6 +175,7 @@
     .sidebar:not(.expanded) .sb-item span,
     .sidebar:not(.expanded) .account-name,
     .sidebar:not(.expanded) .account-chev,
+    .sidebar:not(.expanded) .account-credits-badge,
     .sidebar:not(.expanded) .account-login span { display: none; }
     .sidebar:not(.expanded) .sb-item { justify-content: center; }
     .sidebar:not(.expanded) .account-chip { justify-content: center; min-width: 0; padding: 7px; }
@@ -245,6 +247,17 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .account-chev { color: var(--faint); transition: transform .2s; flex: none; }
+
+  /* Badge crédits IA sur le chip du compte : visible sans ouvrir le menu ; le
+     détail (jauge + explication) reste dans le dropdown. */
+  .account-credits-badge[hidden] { display: none; }
+  .account-credits-badge {
+    flex: none; font-size: 11px; font-weight: 700; line-height: 1;
+    color: var(--sand); background: var(--sand-soft);
+    border: 1px solid var(--border-2); border-radius: 999px;
+    padding: 3px 7px;
+  }
+  .account-credits-badge.empty { color: var(--err); border-color: rgba(221,139,120,0.4); }
 
   .account-menu {
     position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 7;

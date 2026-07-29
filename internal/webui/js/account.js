@@ -26,12 +26,19 @@ async function loadServerHistory() {
 // (par défaut, valeurs réelles renvoyées par le serveur), remis à zéro chaque
 // nuit. Masquée si la génération IA n'est pas proposée à ce compte.
 function renderCredits(tokensRemaining, dailyBudget, creditsPerDay) {
-  const box = $("accountCredits");
-  if (tokensRemaining == null || !dailyBudget) { box.hidden = true; return; }
-  box.hidden = false;
+  const badge = $("accountCreditsBadge"), box = $("accountCredits");
+  if (tokensRemaining == null || !dailyBudget) { badge.hidden = true; box.hidden = true; return; }
   const tokensPerCredit = dailyBudget / (creditsPerDay || 1);
   const creditsRemaining = Math.max(0, Math.min(creditsPerDay, Math.round(tokensRemaining / tokensPerCredit)));
   const pct = Math.max(0, Math.min(100, Math.round(tokensRemaining * 100 / dailyBudget)));
+
+  // Badge sur le chip (toujours visible, sans ouvrir le menu).
+  badge.hidden = false;
+  badge.textContent = `${creditsRemaining}/${creditsPerDay}`;
+  badge.classList.toggle("empty", tokensRemaining <= 0);
+
+  // Détail (jauge + explication) : reste dans le dropdown existant.
+  box.hidden = false;
   $("accountCreditsCount").textContent = `${creditsRemaining} / ${creditsPerDay}`;
   $("accountCreditsFill").style.width = `${pct}%`;
   $("accountCreditsFill").parentElement.classList.toggle("empty", tokensRemaining <= 0);
