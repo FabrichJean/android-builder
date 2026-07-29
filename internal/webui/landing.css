@@ -11,6 +11,26 @@
   --sand:      #e0c07d;
   --sand-dim:  #c9a86a;
   --sand-soft: rgba(224, 192, 125, 0.12);
+  --nav-bg:    rgba(8, 7, 3, 0.8);
+  --well:      rgba(16, 13, 8, 0.85);
+  --chip-bg:   rgba(8, 7, 3, 0.5);
+}
+
+/* ---- thème clair (bascule manuelle, voir js/theme.js) ---- */
+:root[data-theme="light"] {
+  --bg:        #f7f3ea;
+  --surface:   #fffdf8;
+  --surface-2: #f3ecdd;
+  --border:    rgba(90, 66, 26, 0.14);
+  --border-2:  rgba(90, 66, 26, 0.26);
+  --text:      #241d0f;
+  --muted:     #6b6047;
+  --faint:     #948764;
+  --sand:      #b8863f;
+  --sand-dim:  #9c6f31;
+  --sand-soft: rgba(184, 134, 63, 0.14);
+  --nav-bg:    rgba(247, 243, 234, 0.82);
+  --well:      rgba(255, 253, 248, 0.9);
 }
 
 * { box-sizing: border-box; }
@@ -66,7 +86,7 @@ code {
   position: sticky; top: 0; z-index: 50;
   display: flex; align-items: center; gap: 26px;
   padding: 14px 28px;
-  background: rgba(8,7,3,0.8); backdrop-filter: blur(10px);
+  background: var(--nav-bg); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
 .nav-brand { display: flex; align-items: center; gap: 9px; font-weight: 750; font-size: 15.5px; }
@@ -76,6 +96,17 @@ code {
 .nav-links a:hover { color: var(--sand); }
 .nav-cta { font-size: 13px; padding: 8px 16px; }
 @media (max-width: 720px) { .nav-links { display: none; } }
+
+/* bascule thème clair/sombre */
+.theme-toggle {
+  display: grid; place-items: center; width: 34px; height: 34px; flex: none;
+  background: transparent; border: 1px solid var(--border-2); border-radius: 50%;
+  color: var(--muted); cursor: pointer; transition: color .15s, border-color .15s;
+}
+.theme-toggle:hover { color: var(--sand); border-color: var(--sand); }
+.theme-toggle .theme-ic-moon { display: none; }
+:root[data-theme="light"] .theme-toggle .theme-ic-sun { display: none; }
+:root[data-theme="light"] .theme-toggle .theme-ic-moon { display: block; }
 
 /* ===== héro ===== */
 .hero {
@@ -109,7 +140,7 @@ code {
 .mock-prompt {
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
   max-width: 640px; margin: 0 auto 30px; padding: 16px 16px 16px 20px;
-  background: rgba(16, 13, 8, 0.85);
+  background: var(--well);
   border: 1px solid var(--border-2); border-radius: 18px;
   box-shadow: 0 24px 60px -24px rgba(0,0,0,0.85), inset 0 1px 0 rgba(224,192,125,0.07);
   text-align: left; cursor: pointer;

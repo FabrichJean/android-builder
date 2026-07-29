@@ -16,6 +16,32 @@
     --err:       #dd8b78;
     --radius:    14px;
     --shadow:    0 18px 50px -20px rgba(0,0,0,0.7);
+    /* panneaux "en creux" (champs, tuiles, sidebar) : légèrement distincts du
+       fond, pour la même raison en clair qu'en sombre. */
+    --sidebar-bg: #0d0b06;
+    --well:       #100d08;
+  }
+
+  /* ---- thème clair (bascule manuelle, voir js/theme.js) ---- */
+  :root[data-theme="light"] {
+    --bg:        #f7f3ea;
+    --bg-glow:   #efe6d2;
+    --surface:   #fffdf8;
+    --surface-2: #f3ecdd;
+    --border:    rgba(90, 66, 26, 0.14);
+    --border-2:  rgba(90, 66, 26, 0.26);
+    --text:      #241d0f;
+    --muted:     #6b6047;
+    --faint:     #948764;
+    --sand:      #b8863f;
+    --sand-dim:  #9c6f31;
+    --sand-soft: rgba(184, 134, 63, 0.14);
+    --ok:        #3f7a4f;
+    --warn:      #9c6f31;
+    --err:       #b8493a;
+    --shadow:    0 18px 50px -20px rgba(60,45,15,0.25);
+    --sidebar-bg: #efe6d2;
+    --well:       #fbf7ee;
   }
 
   * { box-sizing: border-box; }
@@ -46,12 +72,27 @@
     vertical-align: -0.22em;
   }
 
+  /* bascule thème clair/sombre : flottant, joignable que la sidebar soit
+     visible, réduite ou masquée (anonyme). */
+  .theme-toggle {
+    position: fixed; bottom: 20px; left: 20px; z-index: 40;
+    display: grid; place-items: center; width: 40px; height: 40px;
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border-2); border-radius: 50%; color: var(--muted);
+    cursor: pointer; box-shadow: 0 10px 26px -12px rgba(0,0,0,0.5);
+    transition: color .15s, border-color .15s;
+  }
+  .theme-toggle:hover { color: var(--sand); border-color: var(--sand); }
+  .theme-toggle .theme-ic-moon { display: none; }
+  :root[data-theme="light"] .theme-toggle .theme-ic-sun { display: none; }
+  :root[data-theme="light"] .theme-toggle .theme-ic-moon { display: block; }
+
   /* ---- coquille app (sidebar + contenu), inspirée d'un shell type bolt.new ---- */
   .app-shell { display: flex; min-height: 100vh; }
 
   .sidebar {
     width: 248px; flex: none; display: flex; flex-direction: column;
-    background: #0d0b06; border-right: 1px solid var(--border);
+    background: var(--sidebar-bg); border-right: 1px solid var(--border);
     padding: 14px 12px; gap: 4px;
     position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto;
     transition: width .2s ease;
@@ -72,7 +113,7 @@
 
   .sb-search {
     display: flex; align-items: center; gap: 8px;
-    background: #17130c; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--well); border: 1px solid var(--border); border-radius: 10px;
     padding: 9px 11px; margin-bottom: 10px; color: var(--faint);
   }
   .sb-search .ic { flex: none; }
@@ -152,7 +193,7 @@
   .account[hidden], .account-login[hidden], .account-user[hidden], .account-menu[hidden] { display: none; }
   .account-login {
     display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
-    background: #16130c; border: 1px solid var(--border-2); color: var(--text);
+    background: var(--well); border: 1px solid var(--border-2); color: var(--text);
     font-family: inherit; font-size: 13px; font-weight: 600;
     padding: 9px 12px; border-radius: 10px; cursor: pointer;
   }
@@ -227,7 +268,7 @@
 
   /* ---- carte de création (barre de prompt) ---- */
   .card {
-    background: #0e0c07;
+    background: var(--well);
     border: 1px solid var(--border);
     border-radius: 22px;
     padding: 8px;
@@ -361,7 +402,7 @@
   .pb-chips { display: flex; gap: 8px; flex-wrap: wrap; }
   .chip {
     display: inline-flex; align-items: center; gap: 7px;
-    background: #100d08; border: 1px solid var(--border); color: var(--muted);
+    background: var(--well); border: 1px solid var(--border); color: var(--muted);
     font-family: inherit; font-size: 13px; font-weight: 550;
     padding: 8px 12px; border-radius: 10px; cursor: pointer;
     transition: color .15s, border-color .15s, background .15s;
@@ -370,10 +411,10 @@
   .chip.active { color: var(--sand); border-color: var(--sand); background: var(--sand-soft); }
   .chip-thumb {
     width: 18px; height: 18px; border-radius: 5px; flex: none;
-    background: #1c1810; background-size: cover; background-position: center;
+    background: var(--well); background-size: cover; background-position: center;
     box-shadow: inset 0 0 0 1px var(--border-2);
   }
-  .swatch { width: 16px; height: 16px; border-radius: 5px; flex: none; border: 1px solid var(--border-2); background: #14110b; }
+  .swatch { width: 16px; height: 16px; border-radius: 5px; flex: none; border: 1px solid var(--border-2); background: var(--well); }
   .pb-submit { width: auto; margin: 0; padding: 11px 22px; }
 
   /* popovers des puces */
@@ -462,7 +503,7 @@
   .custom-toggle {
     position: relative; z-index: 1;
     width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    background: linear-gradient(180deg, #221c12, #1a150d);
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
     border: 1px solid var(--border-2); color: var(--sand);
     font-family: inherit; font-size: 15px; font-weight: 650; text-align: left;
     padding: 15px 18px; border-radius: 13px; cursor: pointer;
@@ -475,7 +516,7 @@
   .custom-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
   .custom-panel {
     margin-top: 10px; padding: 18px;
-    background: #100d08; border: 1px solid var(--border); border-radius: 13px;
+    background: var(--well); border: 1px solid var(--border); border-radius: 13px;
     animation: pop .2s ease;
   }
   .custom-panel[hidden] { display: none; }
@@ -507,7 +548,7 @@
   .recent-viewall:hover { color: var(--sand-dim); }
   .recent-viewall[hidden] { display: none; }
   .recent-viewall .ic { width: 14px; height: 14px; }
-  .tabs { display: flex; gap: 4px; background: #100d08; border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+  .tabs { display: flex; gap: 4px; background: var(--well); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
   .tab {
     border: none; background: transparent; cursor: pointer; font-family: inherit;
     color: var(--muted); font-size: 13px; font-weight: 550; padding: 7px 13px; border-radius: 7px;
@@ -521,7 +562,7 @@
   /* sélecteur de mode */
   .seg {
     display: flex; gap: 4px; margin-bottom: 18px;
-    background: #100d08; border: 1px solid var(--border);
+    background: var(--well); border: 1px solid var(--border);
     border-radius: 11px; padding: 4px;
   }
   .seg button {
@@ -539,7 +580,7 @@
   .drop {
     border: 1px dashed var(--border-2); border-radius: 11px;
     padding: 20px; text-align: center; cursor: pointer;
-    color: var(--muted); font-size: 13.5px; background: #100d08;
+    color: var(--muted); font-size: 13.5px; background: var(--well);
     transition: border-color .15s, background .15s, color .15s;
   }
   .drop:hover, .drop.over { border-color: var(--sand); color: var(--sand); background: var(--sand-soft); }
@@ -565,7 +606,7 @@
 
   input {
     width: 100%;
-    background: #100d08;
+    background: var(--well);
     border: 1px solid var(--border);
     color: var(--text);
     font-size: 15px;
@@ -579,7 +620,7 @@
     outline: none;
     border-color: var(--border-2);
     box-shadow: 0 0 0 3px var(--sand-soft);
-    background: #130f09;
+    background: var(--well);
   }
   input:invalid:not(:placeholder-shown) { border-color: rgba(221,139,120,0.4); }
 
@@ -627,7 +668,7 @@
   .switch-row .switch-label small { display: block; font-size: 11.5px; color: var(--faint); font-weight: 400; margin-top: 1px; }
   .switch {
     position: relative; flex: none; width: 42px; height: 24px; border-radius: 999px;
-    background: #100d08; border: 1px solid var(--border-2); transition: background .18s;
+    background: var(--well); border: 1px solid var(--border-2); transition: background .18s;
   }
   .switch::after {
     content: ""; position: absolute; top: 2px; left: 2px;
@@ -643,7 +684,7 @@
   .appearance-controls { flex: 1; display: flex; flex-direction: column; gap: 14px; }
   .icon-tile {
     display: flex; align-items: center; gap: 12px; cursor: pointer;
-    background: #100d08; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--well); border: 1px solid var(--border); border-radius: 12px;
     padding: 10px; color: var(--muted); font-family: inherit; text-align: left;
     transition: border-color .15s;
   }
@@ -706,7 +747,7 @@
   .modal-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
   .crop-stage {
     position: relative; width: 288px; height: 288px; max-width: 100%;
-    margin: 0 auto; border-radius: 12px; overflow: hidden; background: #0d0a06;
+    margin: 0 auto; border-radius: 12px; overflow: hidden; background: var(--well);
     touch-action: none; cursor: grab;
   }
   .crop-stage:active { cursor: grabbing; }
