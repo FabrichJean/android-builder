@@ -16,10 +16,14 @@
     --err:       #dd8b78;
     --radius:    14px;
     --shadow:    0 18px 50px -20px rgba(0,0,0,0.7);
-    /* panneaux "en creux" (champs, tuiles, sidebar) : légèrement distincts du
-       fond, pour la même raison en clair qu'en sombre. */
-    --sidebar-bg: #0d0b06;
-    --well:       #100d08;
+    /* panneaux "en creux" (champs, tuiles, sidebar) : nettement plus sombres
+       et plus neutres (moins de teinte marron) que --surface, pour un vrai
+       contraste avec les éléments "en relief" (chips, cartes) au-dessus. */
+    --sidebar-bg: #060503;
+    --well:       #070604;
+    /* liseré neutre (gris) pour la sidebar et la carte de création : la
+       teinte marron de --border s'y voyait trop, redondante avec --sand. */
+    --border-mute: rgba(255, 255, 255, 0.07);
     /* look "glossy" partagé par tous les boutons dorés (même recette que le
        prompteur géant de la landing) */
     --gold-grad:   linear-gradient(165deg, #f6e3b0, var(--sand) 45%, #a8894f);
@@ -48,6 +52,7 @@
     --shadow:    0 18px 50px -20px rgba(60,45,15,0.25);
     --sidebar-bg: #efe6d2;
     --well:       #fbf7ee;
+    --border-mute: rgba(0, 0, 0, 0.1);
   }
 
   * { box-sizing: border-box; }
@@ -112,10 +117,15 @@
   .app-shell { display: flex; min-height: 100vh; }
 
   .sidebar {
-    width: 248px; flex: none; display: flex; flex-direction: column;
-    background: var(--sidebar-bg); border-right: 1px solid var(--border);
+    width: 280px; flex: none; display: flex; flex-direction: column;
+    background: var(--sidebar-bg); border-right: 1px solid var(--border-mute);
     padding: 14px 12px; gap: 4px;
-    position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto;
+    /* z-index explicite : .hero (position:relative pour son glow décoratif)
+       vient après la sidebar dans le DOM, donc sans ça il repeindrait par
+       dessus (z-index:auto, ordre du DOM) et masquerait tout élément fixed/
+       absolute de la sidebar qui déborde sur la zone principale (ex. le
+       bouton collapse flottant en mode réduit). */
+    position: sticky; top: 0; z-index: 1; align-self: flex-start; height: 100vh; overflow-y: auto;
     transition: width .2s ease;
   }
   .sidebar.collapsed { width: 72px; }
@@ -131,10 +141,21 @@
   .sb-collapse:hover { color: var(--sand); background: var(--sand-soft); }
   .sb-collapse .ic { width: 15px; height: 15px; }
   .sidebar.collapsed .sb-collapse .ic { transform: rotate(180deg); }
+  /* Réduite : le bouton sort de la colonne 72px et flotte sur la bordure.
+     position: fixed (pas absolute) car .sidebar a overflow-y: auto, qui
+     clippe aussi tout débordement horizontal d'un descendant positionné
+     relativement à elle — fixed échappe au clipping en se positionnant par
+     rapport au viewport. */
+  .sidebar.collapsed .sb-collapse {
+    position: fixed; top: 14px; left: 60px; z-index: 5;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border-2); box-shadow: var(--shadow);
+  }
 
   .sb-search {
     display: flex; align-items: center; gap: 8px;
-    background: var(--well); border: 1px solid var(--border); border-radius: 10px;
+    background: var(--well); border: 1px solid var(--border-mute); border-radius: 10px;
     padding: 9px 11px; margin-bottom: 10px; color: var(--faint);
   }
   .sb-search .ic { flex: none; }
@@ -155,6 +176,42 @@
   .sb-item .ic { flex: none; }
   .sb-item:hover { color: var(--text); background: rgba(224,192,125,0.06); }
   .sb-item.active { color: var(--sand); background: var(--sand-soft); }
+
+  /* ---- carte "contribuer" en pied de sidebar : plaquée en bas via
+     margin-top:auto (dernier enfant du flex column de .sidebar). ---- */
+  .sb-promo {
+    margin-top: auto; position: relative; overflow: hidden;
+    border: 1px solid var(--border-mute); border-radius: 14px;
+    background: var(--sidebar-bg);
+  }
+  .sb-promo[hidden] { display: none; }
+  .sb-promo-close {
+    position: absolute; top: 8px; right: 8px; z-index: 2;
+    width: 22px; height: 22px; display: grid; place-items: center;
+    border-radius: 50%; border: none; background: rgba(0,0,0,0.25);
+    color: var(--muted); cursor: pointer;
+  }
+  .sb-promo-close:hover { color: var(--text); background: rgba(0,0,0,0.4); }
+  .sb-promo-close .ic { width: 12px; height: 12px; }
+
+  .sb-promo-art { display: block; width: 100%; height: 88px; object-fit: cover; }
+
+  .sb-promo-body { padding: 10px 14px 14px; }
+  .sb-promo-title { margin: 0 0 4px; font-size: 13.5px; font-weight: 750; color: var(--text); }
+  .sb-promo-text {
+    margin: 0 0 12px; font-size: 12px; line-height: 1.45; color: var(--muted);
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    line-clamp: 2; overflow: hidden;
+  }
+  .sb-promo-cta {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 9px 12px; border-radius: 10px;
+    background: var(--gold-grad); box-shadow: var(--gold-shadow);
+    color: #201a0e; font-weight: 700; font-size: 13px;
+    text-decoration: none; transition: filter .15s;
+  }
+  .sb-promo-cta:hover { filter: brightness(1.04); }
+  .sb-promo-cta .ic { fill: currentColor; stroke: none; width: 15px; height: 15px; }
 
   .main { flex: 1; min-width: 0; overflow-y: auto; height: 100vh; }
   .view[hidden] { display: none; }
@@ -187,6 +244,16 @@
   .sidebar.collapsed .sb-item { justify-content: center; }
   .sidebar.collapsed .account-chip { justify-content: center; min-width: 0; padding: 7px; }
   .sidebar.collapsed .account-login { justify-content: center; padding: 9px; }
+  /* logo seul (le texte à côté est masqué ci-dessus) : centré et agrandi. */
+  .sidebar.collapsed .sb-top { justify-content: center; }
+  .sidebar.collapsed .brand-mark { width: 28px; height: 28px; }
+  /* trop de contenu pour tenir en icône seule : masquée en réduit. */
+  .sidebar.collapsed .sb-promo { display: none; }
+  /* Réduite, la carte compte se résume à l'avatar : le badge en coin (pensé
+     pour une carte large) écraserait/chevaucherait l'avatar. Pas la place
+     pour une bascule de thème lisible ici : masquée (accessible via la
+     sidebar dépliée). */
+  .sidebar.collapsed .theme-toggle--corner { display: none; }
 
   @media (max-width: 760px) {
     .sidebar:not(.expanded) { width: 72px; }
@@ -200,6 +267,17 @@
     .sidebar:not(.expanded) .sb-item { justify-content: center; }
     .sidebar:not(.expanded) .account-chip { justify-content: center; min-width: 0; padding: 7px; }
     .sidebar:not(.expanded) .account-login { justify-content: center; padding: 9px; }
+    .sidebar:not(.expanded) .sb-top { justify-content: center; }
+    .sidebar:not(.expanded) .brand-mark { width: 28px; height: 28px; }
+    .sidebar:not(.expanded) .sb-promo { display: none; }
+    .sidebar:not(.expanded) .theme-toggle--corner { display: none; }
+    .sidebar:not(.expanded) .sb-collapse .ic { transform: rotate(180deg); }
+    .sidebar:not(.expanded) .sb-collapse {
+      position: fixed; top: 14px; left: 60px; z-index: 5;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: linear-gradient(180deg, var(--surface), var(--surface-2));
+      border: 1px solid var(--border-2); box-shadow: var(--shadow);
+    }
   }
 
   /* ---- hero ---- */
@@ -342,7 +420,7 @@
   /* ---- carte de création (barre de prompt) ---- */
   .card {
     background: var(--well);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-mute);
     border-radius: 22px;
     padding: 8px;
     box-shadow: var(--shadow);
