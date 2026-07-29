@@ -139,6 +139,7 @@ function clearIcon() {
   if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; }
   $("iconImg").style.backgroundImage = "";
   $("phoneIcon").style.backgroundImage = "";
+  deselectIconSuggestion();
 }
 function setIcon(blob) {
   if (iconURL) URL.revokeObjectURL(iconURL);
@@ -231,7 +232,50 @@ $("cropOk").addEventListener("click", () => {
   iconPreview = prev.toDataURL("image/png");
   out.toBlob((blob) => { if (blob) setIcon(blob); }, "image/png");
   cropModal.classList.remove("open");
+  deselectIconSuggestion();
 });
+
+// ---- galerie de suggestions d'icône (générées : dégradé + initiale) ----
+const iconSuggestions = $("iconSuggestions");
+const ICON_HUES = [18, 48, 95, 150, 190, 230, 275, 320];
+function deselectIconSuggestion() {
+  const sel = iconSuggestions.querySelector(".selected");
+  if (sel) sel.classList.remove("selected");
+}
+function renderIconSuggestions() {
+  const letter = ($("name").value.trim()[0] || "A").toUpperCase();
+  iconSuggestions.innerHTML = ICON_HUES.map(h => `
+    <button type="button" class="icon-suggestion" data-hue="${h}" title="Utiliser cette icône"
+      style="background:linear-gradient(150deg,hsl(${h},55%,55%),hsl(${(h + 40) % 360},60%,32%))"
+      >${letter}</button>`).join("");
+}
+function applyIconSuggestion(btn) {
+  const hue = +btn.dataset.hue;
+  const letter = ($("name").value.trim()[0] || "A").toUpperCase();
+  const size = 512;
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  const ictx = c.getContext("2d");
+  const grad = ictx.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, `hsl(${hue},55%,55%)`);
+  grad.addColorStop(1, `hsl(${(hue + 40) % 360},60%,32%)`);
+  ictx.fillStyle = grad; ictx.fillRect(0, 0, size, size);
+  ictx.fillStyle = "rgba(255,255,255,.92)";
+  ictx.font = `700 ${size * 0.52}px system-ui, sans-serif`;
+  ictx.textAlign = "center"; ictx.textBaseline = "middle";
+  ictx.fillText(letter, size / 2, size / 2 + size * 0.03);
+  const prev = document.createElement("canvas"); prev.width = prev.height = 128;
+  prev.getContext("2d").drawImage(c, 0, 0, 128, 128);
+  iconPreview = prev.toDataURL("image/png");
+  c.toBlob((blob) => { if (blob) setIcon(blob); }, "image/png");
+  deselectIconSuggestion();
+  btn.classList.add("selected");
+}
+iconSuggestions.addEventListener("click", (e) => {
+  const btn = e.target.closest(".icon-suggestion");
+  if (btn) applyIconSuggestion(btn);
+});
+$("name").addEventListener("input", renderIconSuggestions);
+renderIconSuggestions();
 
 syncSplash(); updatePreview();
 

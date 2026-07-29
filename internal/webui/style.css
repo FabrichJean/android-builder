@@ -851,6 +851,18 @@
   .icon-edit { font-size: 13px; font-weight: 600; color: var(--text); }
   .icon-tile:hover .icon-edit { color: var(--sand); }
 
+  .icon-gallery { margin-top: 14px; }
+  .icon-suggestions { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; }
+  .icon-suggestion {
+    width: 44px; height: 44px; border-radius: 11px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 700; color: rgba(255,255,255,.92); font-family: inherit;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .icon-suggestion:hover { transform: translateY(-2px); }
+  .icon-suggestion.selected { box-shadow: 0 0 0 2px var(--sand); }
+
   .mini-label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 7px; }
   .color-row { display: flex; gap: 8px; align-items: center; }
   input[type=color] {
