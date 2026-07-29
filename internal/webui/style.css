@@ -136,6 +136,14 @@
   .sb-collapse:hover { color: var(--sand); background: var(--sand-soft); }
   .sb-collapse .ic { width: 15px; height: 15px; }
   .sidebar.collapsed .sb-collapse .ic { transform: rotate(180deg); }
+  /* Réduite : le bouton sort de la colonne 72px et flotte sur la bordure,
+     pour ne pas se serrer contre le logo ni rétrécir encore la place utile. */
+  .sidebar.collapsed .sb-collapse {
+    position: absolute; top: 14px; right: -12px; z-index: 5;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border-2); box-shadow: var(--shadow);
+  }
 
   .sb-search {
     display: flex; align-items: center; gap: 8px;
