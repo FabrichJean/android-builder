@@ -120,7 +120,12 @@
     width: 280px; flex: none; display: flex; flex-direction: column;
     background: var(--sidebar-bg); border-right: 1px solid var(--border-mute);
     padding: 14px 12px; gap: 4px;
-    position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto;
+    /* z-index explicite : .hero (position:relative pour son glow décoratif)
+       vient après la sidebar dans le DOM, donc sans ça il repeindrait par
+       dessus (z-index:auto, ordre du DOM) et masquerait tout élément fixed/
+       absolute de la sidebar qui déborde sur la zone principale (ex. le
+       bouton collapse flottant en mode réduit). */
+    position: sticky; top: 0; z-index: 1; align-self: flex-start; height: 100vh; overflow-y: auto;
     transition: width .2s ease;
   }
   .sidebar.collapsed { width: 72px; }
