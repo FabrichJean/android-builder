@@ -84,36 +84,42 @@ form.addEventListener("submit", async (e) => {
 
   submit.disabled = true;
   const showProgress = mode === "bundle";
-  // Entrée temporaire dans le dock "Builds en cours" : montre la progression
-  // de l'envoi avant même que le build n'existe côté serveur.
-  let uploadEntry = null;
+  // Part de la barre de progression globale réservée à l'envoi (le reste
+  // suit la compilation serveur) : une seule entrée, une seule progression
+  // continue dans le dock "Builds en cours", pas deux barres qui se suivent.
+  const UPLOAD_CAP = 15;
+  let entry = null;
   if (showProgress) {
-    uploadEntry = {
-      id: "upload-" + Date.now(), status: "uploading", progress: 0,
+    entry = {
+      id: "upload-" + Date.now(), status: "uploading", progress: 0, uploadCap: UPLOAD_CAP,
       app_name: appName, url: listURL, mode,
       icon: iconPreview || distIconPreview || null, splash: splashHex(),
     };
-    builds.unshift(uploadEntry);
+    builds.unshift(entry);
     render();
   }
   try {
-    const { ok, data } = await postBuild(fd, showProgress ? (frac) => {
-      uploadEntry.progress = Math.round(frac * 100);
-      patch(uploadEntry);
+    const { ok, data } = await postBuild(fd, entry ? (frac) => {
+      entry.progress = Math.round(frac * UPLOAD_CAP);
+      patch(entry);
     } : null);
-    if (uploadEntry) { removeBuildById(uploadEntry.id); uploadEntry = null; }
     if (!ok) throw new Error(data.error || "Erreur serveur");
 
-    builds.unshift({
-      id: data.id, status: data.status || "pending",
-      url: listURL, app_name: appName, mode,
-      icon: iconPreview || distIconPreview || null, splash: splashHex(),
-    });
+    if (entry) {
+      Object.assign(entry, { id: data.id, status: data.status || "pending", progress: UPLOAD_CAP });
+    } else {
+      entry = {
+        id: data.id, status: data.status || "pending",
+        url: listURL, app_name: appName, mode,
+        icon: iconPreview || distIconPreview || null, splash: splashHex(),
+      };
+      builds.unshift(entry);
+    }
     saveLocal(); render(); subscribe(data.id);
     pollThumbs(0);
     form.reset(); clearDist(); clearIcon(); syncSplash(); updatePreview();
   } catch (err) {
-    if (uploadEntry) { removeBuildById(uploadEntry.id); uploadEntry = null; render(); }
+    if (entry) { removeBuildById(entry.id); entry = null; render(); }
     fail(err.message);
   } finally {
     submit.disabled = false;

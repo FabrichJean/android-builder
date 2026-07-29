@@ -14,11 +14,17 @@ export function subscribe(id) {
     try { data = JSON.parse(e.data); } catch { return; }
     const b = builds.find(x => x.id === id);
     if (!b) { es.close(); streams.delete(id); return; }
+    // L'envoi du projet occupe déjà les premiers % de la barre (voir
+    // create-form.js) : la progression du build serveur (0-100) est
+    // recalée dans le reste de la plage pour rester une seule progression
+    // continue, plutôt que de repartir de 0 après l'envoi.
+    const raw = data.progress || 0;
+    const progress = b.uploadCap ? b.uploadCap + raw * (100 - b.uploadCap) / 100 : raw;
     Object.assign(b, {
       status: data.status,
       run_url: data.run_url || b.run_url,
       error: data.error || "",
-      progress: data.progress || 0,
+      progress: Math.round(progress),
       current_step: data.current_step || "",
       steps: data.steps || [],
     });
