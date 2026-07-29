@@ -31,6 +31,7 @@
   --sand-soft: rgba(184, 134, 63, 0.14);
   --nav-bg:    rgba(247, 243, 234, 0.82);
   --well:      rgba(255, 253, 248, 0.9);
+  --chip-bg:   rgba(255, 253, 248, 0.7);
 }
 
 * { box-sizing: border-box; }
@@ -438,7 +439,7 @@ code {
 .gp-chips span {
   font-size: 12px; font-weight: 650; color: var(--muted);
   border: 1px solid var(--border-2); border-radius: 999px; padding: 5px 13px;
-  background: rgba(8, 7, 3, 0.5); backdrop-filter: blur(3px);
+  background: var(--chip-bg); backdrop-filter: blur(3px);
 }
 
 /* -- 2 · courbe de montée -- */
