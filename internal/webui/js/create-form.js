@@ -128,6 +128,9 @@ form.addEventListener("submit", async (e) => {
 
 // ---- icône + splash + aperçu ----
 let iconBlob = null, iconURL = null, iconPreview = null;
+// "auto" tant que l'utilisateur n'a pas choisi lui-même une icône (upload,
+// suggestion, recherche) : l'icône suit alors automatiquement le nom de l'app.
+let iconSource = "auto";
 const splashColor = $("splashColor"), splashHexInput = $("splashHex");
 
 function splashHex() {
@@ -135,7 +138,7 @@ function splashHex() {
   return /^#[0-9a-fA-F]{6}$/.test(v) ? v : splashColor.value;
 }
 function clearIcon() {
-  iconBlob = null; iconPreview = null;
+  iconBlob = null; iconPreview = null; iconSource = "auto";
   if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; }
   $("iconImg").style.backgroundImage = "";
   $("phoneIcon").style.backgroundImage = "";
@@ -235,62 +238,99 @@ $("cropOk").addEventListener("click", () => {
   deselectIconSuggestion();
 });
 
-// ---- galerie de suggestions d'icône (pictogrammes réels sur fond dégradé) ----
-const iconSuggestions = $("iconSuggestions");
-// Glyphes ligne (style Feather, viewBox 24x24) — mêmes conventions que ICONS
-// dans core.js (stroke, pas de remplissage), un par teinte de dégradé.
-const ICON_SUGGESTIONS = [
-  { hue: 18,  d: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" }, // musique
-  { hue: 48,  d: "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M15.2 13a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0z" }, // caméra
-  { hue: 95,  d: "M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" }, // panier
-  { hue: 150, d: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" }, // cœur
-  { hue: 190, d: "M21 11.5a8.4 8.4 0 0 1-8.5 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.4 8.4 0 0 1 12.5 3a8.5 8.5 0 0 1 8.5 8.5z" }, // chat
-  { hue: 230, d: "M13 2 3 14h7l-1 8 11-14h-7z" }, // éclair
-  { hue: 275, d: "M12 2l2.9 6.9 7.4.6-5.6 4.9 1.7 7.3L12 17.9 5.6 21.7l1.7-7.3L1.7 9.5l7.4-.6L12 2z" }, // étoile
-  { hue: 320, d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }, // livre
-];
-function iconBg(hue) {
-  return `linear-gradient(150deg,hsl(${hue},55%,55%),hsl(${(hue + 40) % 360},60%,32%))`;
+// ---- logos de marque (logo.dev) ----
+const LOGO_DEV_TOKEN = "pk_HFCehKliSSWKkQkuyE5Gbw"; // clé publique, sûre côté client
+function logoDevPath(query) {
+  const q = query.trim();
+  if (!q) return "";
+  // Ressemble à un domaine (contient un point, pas d'espace) -> recherche directe,
+  // sinon recherche par nom de marque.
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(q) ? q : `name/${encodeURIComponent(q)}`;
 }
+function logoDevURL(path) {
+  return `https://img.logo.dev/${path}?token=${LOGO_DEV_TOKEN}&size=512&format=png&theme=light&fallback=404`;
+}
+// Applique un logo distant (URL logo.dev) comme icône : récupère les octets,
+// génère l'aperçu 128px persisté, et alimente le pipeline d'upload existant.
+async function applyLogoURL(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error();
+  const blob = await res.blob();
+  const img = new Image();
+  await new Promise((resolve, reject) => {
+    img.onload = resolve; img.onerror = reject;
+    img.src = URL.createObjectURL(blob);
+  });
+  const prev = document.createElement("canvas"); prev.width = prev.height = 128;
+  prev.getContext("2d").drawImage(img, 0, 0, 128, 128);
+  iconPreview = prev.toDataURL("image/png");
+  URL.revokeObjectURL(img.src);
+  setIcon(blob);
+}
+
+// ---- galerie de suggestions : logos de marques connues, via logo.dev ----
+const iconSuggestions = $("iconSuggestions");
+const SUGGESTED_BRANDS = [
+  "google.com", "youtube.com", "spotify.com", "netflix.com",
+  "instagram.com", "discord.com", "twitch.tv", "whatsapp.com",
+];
 function deselectIconSuggestion() {
   const sel = iconSuggestions.querySelector(".selected");
   if (sel) sel.classList.remove("selected");
 }
 function renderIconSuggestions() {
-  iconSuggestions.innerHTML = ICON_SUGGESTIONS.map((s, i) => `
-    <button type="button" class="icon-suggestion" data-i="${i}" title="Utiliser cette icône"
-      style="background:${iconBg(s.hue)}">
-      <svg class="icon-suggestion-svg" viewBox="0 0 24 24"><path d="${s.d}"/></svg>
+  iconSuggestions.innerHTML = SUGGESTED_BRANDS.map((domain) => `
+    <button type="button" class="icon-suggestion" data-domain="${domain}" title="Utiliser le logo de ${domain}">
+      <img class="icon-suggestion-img" src="${logoDevURL(domain)}" alt="" loading="lazy"
+        onerror="this.closest('.icon-suggestion').hidden = true" />
     </button>`).join("");
 }
-function applyIconSuggestion(btn) {
-  const s = ICON_SUGGESTIONS[+btn.dataset.i];
-  const size = 512;
-  const c = document.createElement("canvas"); c.width = c.height = size;
-  const ictx = c.getContext("2d");
-  const grad = ictx.createLinearGradient(0, 0, size, size);
-  grad.addColorStop(0, `hsl(${s.hue},55%,55%)`);
-  grad.addColorStop(1, `hsl(${(s.hue + 40) % 360},60%,32%)`);
-  ictx.fillStyle = grad; ictx.fillRect(0, 0, size, size);
-  // Glyphe centré, avec une marge (comme la zone de sécurité d'une icône adaptative).
-  const scale = (size * 0.56) / 24;
-  ictx.translate((size - 24 * scale) / 2, (size - 24 * scale) / 2);
-  ictx.scale(scale, scale);
-  ictx.strokeStyle = "rgba(255,255,255,.92)";
-  ictx.lineWidth = 2; ictx.lineCap = "round"; ictx.lineJoin = "round";
-  ictx.stroke(new Path2D(s.d));
-  const prev = document.createElement("canvas"); prev.width = prev.height = 128;
-  prev.getContext("2d").drawImage(c, 0, 0, 128, 128);
-  iconPreview = prev.toDataURL("image/png");
-  c.toBlob((blob) => { if (blob) setIcon(blob); }, "image/png");
-  deselectIconSuggestion();
-  btn.classList.add("selected");
-}
-iconSuggestions.addEventListener("click", (e) => {
+iconSuggestions.addEventListener("click", async (e) => {
   const btn = e.target.closest(".icon-suggestion");
-  if (btn) applyIconSuggestion(btn);
+  if (!btn) return;
+  try {
+    await applyLogoURL(logoDevURL(btn.dataset.domain));
+    deselectIconSuggestion();
+    btn.classList.add("selected");
+  } catch {
+    fail("Logo introuvable ou indisponible pour le moment.");
+  }
 });
 renderIconSuggestions();
+
+// ---- recherche libre par nom/domaine, préremplie depuis l'URL encapsulée
+// quand on est en mode "url" ----
+const iconBrandQuery = $("iconBrandQuery"), iconBrandPreview = $("iconBrandPreview");
+const iconBrandImg = $("iconBrandImg"), iconBrandApply = $("iconBrandApply");
+let brandTimer = null;
+function debounceBrandPreview() {
+  clearTimeout(brandTimer);
+  brandTimer = setTimeout(() => {
+    const path = logoDevPath(iconBrandQuery.value);
+    if (!path) { iconBrandPreview.hidden = true; iconBrandImg.removeAttribute("src"); return; }
+    iconBrandImg.src = logoDevURL(path);
+  }, 350);
+}
+iconBrandImg.addEventListener("load", () => { iconBrandPreview.hidden = false; });
+iconBrandImg.addEventListener("error", () => { iconBrandPreview.hidden = true; });
+iconBrandQuery.addEventListener("input", debounceBrandPreview);
+iconBrandApply.addEventListener("click", async () => {
+  if (!iconBrandImg.src) return;
+  try {
+    await applyLogoURL(iconBrandImg.src);
+    deselectIconSuggestion();
+  } catch {
+    fail("Logo introuvable ou indisponible pour le moment.");
+  }
+});
+// Préremplit avec le domaine de l'URL encapsulée (mode "url" uniquement).
+$("url").addEventListener("input", () => {
+  if (mode !== "url") return;
+  try {
+    iconBrandQuery.value = new URL($("url").value.trim()).hostname.replace(/^www\./, "");
+    debounceBrandPreview();
+  } catch { /* URL incomplète : on laisse la recherche telle quelle */ }
+});
 
 syncSplash(); updatePreview();
 

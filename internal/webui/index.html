@@ -443,8 +443,33 @@
                               <span class="icon-edit">Icône</span>
                             </button>
                             <div class="icon-popover">
+                              <span class="icon-popover-label">Logo de la marque</span>
+                              <div class="icon-brand-row">
+                                <input
+                                  type="text"
+                                  id="iconBrandQuery"
+                                  placeholder="ex. Stripe, exemple.com…"
+                                  autocomplete="off"
+                                  spellcheck="false"
+                                />
+                              </div>
+                              <div class="icon-brand-preview" id="iconBrandPreview" hidden>
+                                <button
+                                  type="button"
+                                  class="icon-brand-btn"
+                                  id="iconBrandApply"
+                                  title="Utiliser ce logo"
+                                >
+                                  <img id="iconBrandImg" alt="" />
+                                </button>
+                              </div>
                               <span class="icon-popover-label">Suggestions</span>
                               <div class="icon-suggestions" id="iconSuggestions"></div>
+                              <div class="icon-popover-attrib">
+                                <a href="https://logo.dev" target="_blank" rel="noopener"
+                                  >Logos via logo.dev</a
+                                >
+                              </div>
                             </div>
                           </div>
                           <div class="splash-ctl">
