@@ -81,7 +81,8 @@
   /* bascule thème clair/sombre : deux variantes du même bouton (icônes et
      logique de bascule communes, cf. theme.js qui cible tout [data-theme-toggle]).
      --floating : mode anonyme, sidebar masquée, doit rester joignable seule.
-     --inline : fusionnée au pied de sidebar avec la puce de compte. */
+     --corner : accrochée au coin haut-droit de la carte compte, déborde de
+     son bord (cf. .account-card, position: relative). */
   .theme-toggle {
     display: grid; place-items: center;
     background: linear-gradient(180deg, var(--surface), var(--surface-2));
@@ -100,9 +101,12 @@
   }
   .theme-toggle--floating[hidden] { display: none; }
 
-  .theme-toggle--inline {
-    width: 34px; height: 34px; flex: none; border-radius: 10px;
+  .theme-toggle--corner {
+    position: absolute; top: -8px; right: -8px; z-index: 2;
+    width: 24px; height: 24px; border-radius: 50%;
+    box-shadow: 0 4px 10px -4px rgba(0,0,0,0.5);
   }
+  .theme-toggle--corner .ic { width: 13px; height: 13px; }
 
   /* ---- coquille app (sidebar + contenu), inspirée d'un shell type bolt.new ---- */
   .app-shell { display: flex; min-height: 100vh; }
@@ -141,8 +145,9 @@
   /* pied de sidebar (compte + thème) : plaqué en bas via margin-top:auto sur
      le flex column de .sidebar, séparé de la nav par un filet. */
   .sb-footer { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border-2); }
-  .sb-footer-row { display: flex; align-items: center; gap: 6px; }
-  .sb-footer-row .account-chip { flex: 1; min-width: 0; }
+  /* position: relative ancre le bouton thème en coin (.theme-toggle--corner) ;
+     margin-top laisse la place à son débordement au-dessus de la carte. */
+  .account-card { position: relative; margin-top: 8px; }
   .sb-item {
     display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
     background: none; border: none; border-radius: 9px; padding: 10px;
@@ -184,10 +189,6 @@
   .sidebar.collapsed .sb-item { justify-content: center; }
   .sidebar.collapsed .account-chip { justify-content: center; min-width: 0; padding: 7px; }
   .sidebar.collapsed .account-login { justify-content: center; padding: 9px; }
-  /* Réduite : chip et bascule thème n'ont plus la place l'un à côté de
-     l'autre, on les empile. */
-  .sidebar.collapsed .sb-footer-row { flex-direction: column; }
-  .sidebar.collapsed .theme-toggle--inline { width: 100%; }
 
   @media (max-width: 760px) {
     .sidebar:not(.expanded) { width: 72px; }
@@ -201,8 +202,6 @@
     .sidebar:not(.expanded) .sb-item { justify-content: center; }
     .sidebar:not(.expanded) .account-chip { justify-content: center; min-width: 0; padding: 7px; }
     .sidebar:not(.expanded) .account-login { justify-content: center; padding: 9px; }
-    .sidebar:not(.expanded) .sb-footer-row { flex-direction: column; }
-    .sidebar:not(.expanded) .theme-toggle--inline { width: 100%; }
   }
 
   /* ---- hero ---- */
