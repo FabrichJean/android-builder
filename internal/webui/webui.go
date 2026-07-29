@@ -6,7 +6,7 @@ import (
 	"io/fs"
 )
 
-//go:embed index.html style.css app.js landing.html landing.css js favicon.png demo-icon.png
+//go:embed index.html style.css app.js landing.html landing.css js favicon.png demo-icon.png assets
 var files embed.FS
 
 // FS renvoie le système de fichiers contenant l'UI (HTML, CSS, JS).
