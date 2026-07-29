@@ -43,6 +43,18 @@
             <svg class="ic account-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="account-menu" id="accountMenu" hidden>
+            <div class="account-credits" id="accountCredits" hidden>
+              <div class="account-credits-head">
+                <span class="account-credits-label">Crédits IA</span>
+                <span class="account-credits-count" id="accountCreditsCount">5 / 5</span>
+              </div>
+              <div class="account-credits-track">
+                <span class="account-credits-fill" id="accountCreditsFill" style="width:100%"></span>
+              </div>
+              <p class="account-credits-note">
+                1 crédit = 1000 tokens de génération IA. <strong id="accountCreditsBudget">5 crédits (5000 tokens)</strong> par jour, remis à zéro chaque nuit — utilisés uniquement pour générer une app, pas pour le reste du service (builds URL/projet, historique).
+              </p>
+            </div>
             <button type="button" class="account-menu-item" id="accountLogout">
               <svg class="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
               Se déconnecter
