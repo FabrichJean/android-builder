@@ -31,6 +31,17 @@ genToggle.addEventListener("click", () => {
   setGenMode(!genMode);
 });
 
+// Bascule automatique du mode génération IA selon le contenu du prompteur :
+// une URL désactive le mode IA, tout autre texte non vide l'active — sans
+// forcer l'utilisateur à cliquer le bouton lui-même.
+$("url").addEventListener("input", () => {
+  if (genNeedsLogin || genToggle.hidden || genToggle.disabled) return;
+  const desc = $("url").value.trim();
+  if (!desc) return;
+  const isURL = /^https?:\/\//.test(desc);
+  if (isURL === genMode) setGenMode(!isURL);
+});
+
 function genReset() {
   if (genES) { genES.close(); genES = null; }
   genSession = null; genBusy = false;
