@@ -17,7 +17,7 @@ function thumbStyle(name) {
   return `background:linear-gradient(150deg,hsl(${h},42%,40%),hsl(${(h + 45) % 360},46%,26%))`;
 }
 function matchFilter(b) {
-  if (activeFilter === "active") return b.status === "pending" || b.status === "building";
+  if (activeFilter === "active") return b.status === "uploading" || b.status === "pending" || b.status === "building";
   if (activeFilter === "success") return b.status === "success";
   if (activeFilter === "failed") return b.status === "failed";
   return true;
@@ -105,8 +105,9 @@ recentEl.addEventListener("click", (e) => {
 $("recentViewAll").addEventListener("click", () => switchView("history"));
 
 // ---- dock flottant des builds en cours ----
-const activeBuilds = () => builds.filter(b => b.status === "pending" || b.status === "building");
+const activeBuilds = () => builds.filter(b => b.status === "uploading" || b.status === "pending" || b.status === "building");
 function stepLabel(b) {
+  if (b.status === "uploading") return "Envoi du projet…";
   return b.current_step || (b.status === "pending" ? "Démarrage du workflow…" : "En cours…");
 }
 function activeRow(b) {

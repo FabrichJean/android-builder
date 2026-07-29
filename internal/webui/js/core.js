@@ -19,10 +19,11 @@ export const ICONS = {
 };
 
 export const STATUS = {
-  pending:  { label: "En attente",  cls: "pending"  },
-  building: { label: "Compilation", cls: "building" },
-  success:  { label: "Prêt",        cls: "success"  },
-  failed:   { label: "Échec",       cls: "failed"   },
+  uploading: { label: "Envoi…",      cls: "pending"  },
+  pending:   { label: "En attente",  cls: "pending"  },
+  building:  { label: "Compilation", cls: "building" },
+  success:   { label: "Prêt",        cls: "success"  },
+  failed:    { label: "Échec",       cls: "failed"   },
 };
 export const isTerminal = (s) => s === "success" || s === "failed";
 

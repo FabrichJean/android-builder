@@ -1,7 +1,7 @@
 // Formulaire de création : source (URL ou projet importé), personnalisation
 // (icône, splash, options), et soumission du build.
-import { $, builds, saveLocal } from "./core.js";
-import { render } from "./builds-view.js";
+import { $, builds, saveLocal, removeBuildById } from "./core.js";
+import { render, patch } from "./builds-view.js";
 import { subscribe, pollThumbs } from "./realtime.js";
 import { mb, processDistFiles, extractDistIcon } from "./zip.js";
 // Dépendance circulaire assumée avec gen.js (qui importe getMode/clearDist/
@@ -11,7 +11,6 @@ import { mb, processDistFiles, extractDistIcon } from "./zip.js";
 import { isGenMode, genStart } from "./gen.js";
 
 const form = $("form"), submit = $("submit"), formError = $("formError");
-const uploadProgress = $("uploadProgress"), uploadBar = $("uploadBar"), uploadPct = $("uploadPct");
 
 export function fail(msg) { formError.textContent = msg; }
 
@@ -85,17 +84,24 @@ form.addEventListener("submit", async (e) => {
 
   submit.disabled = true;
   const showProgress = mode === "bundle";
+  // Entrée temporaire dans le dock "Builds en cours" : montre la progression
+  // de l'envoi avant même que le build n'existe côté serveur.
+  let uploadEntry = null;
   if (showProgress) {
-    uploadProgress.hidden = false;
-    uploadBar.style.width = "0%";
-    uploadPct.textContent = "0%";
+    uploadEntry = {
+      id: "upload-" + Date.now(), status: "uploading", progress: 0,
+      app_name: appName, url: listURL, mode,
+      icon: iconPreview || distIconPreview || null, splash: splashHex(),
+    };
+    builds.unshift(uploadEntry);
+    render();
   }
   try {
     const { ok, data } = await postBuild(fd, showProgress ? (frac) => {
-      const pct = Math.round(frac * 100);
-      uploadBar.style.width = pct + "%";
-      uploadPct.textContent = pct + "%";
+      uploadEntry.progress = Math.round(frac * 100);
+      patch(uploadEntry);
     } : null);
+    if (uploadEntry) { removeBuildById(uploadEntry.id); uploadEntry = null; }
     if (!ok) throw new Error(data.error || "Erreur serveur");
 
     builds.unshift({
@@ -107,10 +113,10 @@ form.addEventListener("submit", async (e) => {
     pollThumbs(0);
     form.reset(); clearDist(); clearIcon(); syncSplash(); updatePreview();
   } catch (err) {
+    if (uploadEntry) { removeBuildById(uploadEntry.id); uploadEntry = null; render(); }
     fail(err.message);
   } finally {
     submit.disabled = false;
-    uploadProgress.hidden = true;
   }
 });
 
