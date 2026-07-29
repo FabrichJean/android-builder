@@ -275,12 +275,11 @@ code {
 .mock-custom { display: flex; gap: 20px; align-items: stretch; }
 .mcu-left { flex: 1; display: grid; gap: 14px; align-content: center; justify-items: start; }
 .mcu-icon {
-  display: grid; place-items: center; width: 64px; height: 64px;
-  border-radius: 16px; color: #201a0e;
-  background: linear-gradient(150deg, var(--sand), #b98d52);
+  display: block; width: 64px; height: 64px; flex: none;
+  border-radius: 16px; overflow: hidden;
   box-shadow: 0 12px 26px -10px rgba(224,192,125,0.5);
 }
-.mcu-icon .andro { width: 34px; height: 34px; }
+.mcu-icon img { width: 100%; height: 100%; object-fit: cover; }
 .mcu-swatches { display: flex; align-items: center; gap: 8px; }
 .mcu-swatches i {
   width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent;
@@ -301,11 +300,10 @@ code {
   display: grid; place-items: center; align-content: center; gap: 9px;
 }
 .mcu-appicon {
-  display: grid; place-items: center; width: 38px; height: 38px;
-  border-radius: 11px; color: #201a0e;
-  background: linear-gradient(150deg, var(--sand), #b98d52);
+  display: block; width: 38px; height: 38px; flex: none;
+  border-radius: 11px; overflow: hidden;
 }
-.mcu-appicon .andro { width: 21px; height: 21px; }
+.mcu-appicon img { width: 100%; height: 100%; object-fit: cover; }
 .mcu-appname { font-size: 11px; color: var(--muted); }
 
 /* -- maquette : checklist de build -- */
