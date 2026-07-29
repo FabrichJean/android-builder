@@ -231,10 +231,10 @@
   /* trop de contenu pour tenir en icône seule : masquée en réduit. */
   .sidebar.collapsed .sb-promo { display: none; }
   /* Réduite, la carte compte se résume à l'avatar : le badge en coin (pensé
-     pour une carte large) écraserait/chevaucherait l'avatar. On empile plutôt
-     avatar puis bascule de thème, chacun centré. */
-  .sidebar.collapsed .account-card { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 4px; }
-  .sidebar.collapsed .theme-toggle--corner { position: static; width: 28px; height: 28px; }
+     pour une carte large) écraserait/chevaucherait l'avatar. Pas la place
+     pour une bascule de thème lisible ici : masquée (accessible via la
+     sidebar dépliée). */
+  .sidebar.collapsed .theme-toggle--corner { display: none; }
 
   @media (max-width: 760px) {
     .sidebar:not(.expanded) { width: 72px; }
@@ -249,8 +249,7 @@
     .sidebar:not(.expanded) .account-chip { justify-content: center; min-width: 0; padding: 7px; }
     .sidebar:not(.expanded) .account-login { justify-content: center; padding: 9px; }
     .sidebar:not(.expanded) .sb-promo { display: none; }
-    .sidebar:not(.expanded) .account-card { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 4px; }
-    .sidebar:not(.expanded) .theme-toggle--corner { position: static; width: 28px; height: 28px; }
+    .sidebar:not(.expanded) .theme-toggle--corner { display: none; }
   }
 
   /* ---- hero ---- */
