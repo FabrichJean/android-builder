@@ -432,15 +432,21 @@
                     <div class="custom-panel" id="customPanel" hidden>
                       <div class="appearance">
                         <div class="appearance-controls">
-                          <button
-                            type="button"
-                            class="icon-tile"
-                            id="iconTile"
-                            title="Choisir une icône"
-                          >
-                            <span class="icon-img" id="iconImg"></span>
-                            <span class="icon-edit">Icône</span>
-                          </button>
+                          <div class="icon-picker" id="iconPicker">
+                            <button
+                              type="button"
+                              class="icon-tile"
+                              id="iconTile"
+                              title="Choisir une icône"
+                            >
+                              <span class="icon-img" id="iconImg"></span>
+                              <span class="icon-edit">Icône</span>
+                            </button>
+                            <div class="icon-popover">
+                              <span class="icon-popover-label">Suggestions</span>
+                              <div class="icon-suggestions" id="iconSuggestions"></div>
+                            </div>
+                          </div>
                           <div class="splash-ctl">
                             <span class="mini-label">Fond du splash</span>
                             <div class="color-row">
@@ -468,10 +474,6 @@
                           </div>
                           <span class="phone-caption">Aperçu</span>
                         </div>
-                      </div>
-                      <div class="icon-gallery">
-                        <span class="mini-label">Suggestions d'icône</span>
-                        <div class="icon-suggestions" id="iconSuggestions"></div>
                       </div>
                       <div class="pop-field">
                         <label for="pkg"

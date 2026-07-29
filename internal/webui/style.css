@@ -851,12 +851,25 @@
   .icon-edit { font-size: 13px; font-weight: 600; color: var(--text); }
   .icon-tile:hover .icon-edit { color: var(--sand); }
 
-  .icon-gallery { margin-top: 14px; }
-  .icon-suggestions { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; }
+  /* ---- popover de suggestions d'icône (façon sélecteur d'emoji, au survol) ---- */
+  .icon-picker { position: relative; display: inline-block; }
+  .icon-popover {
+    position: absolute; top: calc(100% + 8px); left: 0; z-index: 30;
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border); border-radius: 14px; padding: 12px;
+    box-shadow: var(--shadow);
+    opacity: 0; visibility: hidden; transform: translateY(-4px);
+    transition: opacity .15s, transform .15s, visibility .15s;
+  }
+  .icon-picker:hover .icon-popover,
+  .icon-popover:hover,
+  .icon-popover:focus-within { opacity: 1; visibility: visible; transform: translateY(0); }
+  .icon-popover-label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
+  .icon-suggestions { display: grid; grid-template-columns: repeat(4, 40px); gap: 8px; }
   .icon-suggestion {
-    width: 44px; height: 44px; border-radius: 11px; border: none; cursor: pointer;
+    width: 40px; height: 40px; border-radius: 11px; border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    font-size: 17px; font-weight: 700; color: rgba(255,255,255,.92); font-family: inherit;
+    font-size: 15px; font-weight: 700; color: rgba(255,255,255,.92); font-family: inherit;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
     transition: transform .15s, box-shadow .15s;
   }
