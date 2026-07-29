@@ -34,7 +34,7 @@ func (m *Manager) IsBanned(userID string) bool {
 }
 
 // recordRejection incrémente le compteur de prompts refusés pour ce compte et
-// le bannit si la limite est dépassée. Renvoie true si le compte vient de
+// le bannit si la limite est atteinte. Renvoie true si le compte vient de
 // passer banni (utile pour informer immédiatement l'utilisateur).
 func (m *Manager) recordRejection(userID string) bool {
 	if m.db == nil || userID == "" {
@@ -55,7 +55,7 @@ func (m *Manager) recordRejection(userID string) bool {
 	if err := m.db.QueryRow(`SELECT rejected_count FROM appgen_abuse WHERE user_id = ?`, userID).Scan(&count); err != nil {
 		return false
 	}
-	if count > maxRejections {
+	if count >= maxRejections {
 		if _, err := m.db.Exec(`UPDATE appgen_abuse SET banned = 1 WHERE user_id = ?`, userID); err != nil {
 			m.log.Warn("bannissement impossible", "user", userID, "err", err)
 			return false
