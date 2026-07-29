@@ -122,6 +122,9 @@ function setAnonymousMode(canLogin) {
   setGenNeedsLogin(canLogin);
   genToggle.title = "Connecte-toi avec Google pour générer une app par IA";
   $("sidebar").hidden = true;
+  // Sidebar masquée : la bascule de thème fusionnée dans son pied n'est plus
+  // joignable, on rallume la version flottante indépendante.
+  $("themeToggleFloating").hidden = false;
   $("anonTopbar").hidden = !canLogin;
   setRecentCount(Infinity);
   $("recentViewAll").hidden = true;
@@ -147,6 +150,9 @@ function setLoggedInMode(genAvailable, genBanned) {
     history.replaceState(null, "", location.pathname);
   }
   $("sidebar").hidden = false;
+  // Sidebar visible : la bascule flottante fait doublon avec celle du pied de
+  // sidebar (fusionnée avec la puce de compte), on la masque.
+  $("themeToggleFloating").hidden = true;
   $("anonTopbar").hidden = true;
   setRecentCount(6);
   $("recentViewAll").hidden = false;

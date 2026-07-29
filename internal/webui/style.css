@@ -78,20 +78,31 @@
     vertical-align: -0.22em;
   }
 
-  /* bascule thème clair/sombre : flottant, joignable que la sidebar soit
-     visible, réduite ou masquée (anonyme). */
+  /* bascule thème clair/sombre : deux variantes du même bouton (icônes et
+     logique de bascule communes, cf. theme.js qui cible tout [data-theme-toggle]).
+     --floating : mode anonyme, sidebar masquée, doit rester joignable seule.
+     --inline : fusionnée au pied de sidebar avec la puce de compte. */
   .theme-toggle {
-    position: fixed; bottom: 20px; left: 20px; z-index: 40;
-    display: grid; place-items: center; width: 40px; height: 40px;
+    display: grid; place-items: center;
     background: linear-gradient(180deg, var(--surface), var(--surface-2));
-    border: 1px solid var(--border-2); border-radius: 50%; color: var(--muted);
-    cursor: pointer; box-shadow: 0 10px 26px -12px rgba(0,0,0,0.5);
-    transition: color .15s, border-color .15s;
+    border: 1px solid var(--border-2); color: var(--muted);
+    cursor: pointer; transition: color .15s, border-color .15s;
   }
   .theme-toggle:hover { color: var(--sand); border-color: var(--sand); }
   .theme-toggle .theme-ic-moon { display: none; }
   :root[data-theme="light"] .theme-toggle .theme-ic-sun { display: none; }
   :root[data-theme="light"] .theme-toggle .theme-ic-moon { display: block; }
+
+  .theme-toggle--floating {
+    position: fixed; bottom: 20px; left: 20px; z-index: 40;
+    width: 40px; height: 40px; border-radius: 50%;
+    box-shadow: 0 10px 26px -12px rgba(0,0,0,0.5);
+  }
+  .theme-toggle--floating[hidden] { display: none; }
+
+  .theme-toggle--inline {
+    width: 34px; height: 34px; flex: none; border-radius: 10px;
+  }
 
   /* ---- coquille app (sidebar + contenu), inspirée d'un shell type bolt.new ---- */
   .app-shell { display: flex; min-height: 100vh; }
@@ -126,6 +137,12 @@
   .sb-search input { flex: 1; min-width: 0; border: none; background: none; box-shadow: none !important; padding: 0; font-size: 13px; color: var(--text); }
 
   .sb-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+
+  /* pied de sidebar (compte + thème) : plaqué en bas via margin-top:auto sur
+     le flex column de .sidebar, séparé de la nav par un filet. */
+  .sb-footer { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border-2); }
+  .sb-footer-row { display: flex; align-items: center; gap: 6px; }
+  .sb-footer-row .account-chip { flex: 1; min-width: 0; }
   .sb-item {
     display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
     background: none; border: none; border-radius: 9px; padding: 10px;
@@ -167,6 +184,10 @@
   .sidebar.collapsed .sb-item { justify-content: center; }
   .sidebar.collapsed .account-chip { justify-content: center; min-width: 0; padding: 7px; }
   .sidebar.collapsed .account-login { justify-content: center; padding: 9px; }
+  /* Réduite : chip et bascule thème n'ont plus la place l'un à côté de
+     l'autre, on les empile. */
+  .sidebar.collapsed .sb-footer-row { flex-direction: column; }
+  .sidebar.collapsed .theme-toggle--inline { width: 100%; }
 
   @media (max-width: 760px) {
     .sidebar:not(.expanded) { width: 72px; }
@@ -180,6 +201,8 @@
     .sidebar:not(.expanded) .sb-item { justify-content: center; }
     .sidebar:not(.expanded) .account-chip { justify-content: center; min-width: 0; padding: 7px; }
     .sidebar:not(.expanded) .account-login { justify-content: center; padding: 9px; }
+    .sidebar:not(.expanded) .sb-footer-row { flex-direction: column; }
+    .sidebar:not(.expanded) .theme-toggle--inline { width: 100%; }
   }
 
   /* ---- hero ---- */
@@ -197,7 +220,6 @@
   .hero-inner { max-width: 680px; margin: 0 auto; }
 
   /* ---- connexion Google (optionnelle) ---- */
-  .account { margin: 2px 0 12px; }
   .account[hidden], .account-login[hidden], .account-user[hidden], .account-menu[hidden] { display: none; }
   .account-login {
     display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
@@ -261,8 +283,11 @@
   .account-credits-badge .ic { width: 12px; height: 12px; }
   .account-credits-badge.empty { color: var(--err); border-color: rgba(221,139,120,0.4); }
 
+  /* Le compte vit maintenant en pied de sidebar : le menu s'ouvre vers le
+     haut (bottom: 100%) pour rester dans la fenêtre plutôt que de déborder
+     sous le viewport. */
   .account-menu {
-    position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 7;
+    position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 7;
     background: linear-gradient(180deg, var(--surface), var(--surface-2));
     border: 1px solid var(--border-2); border-radius: 12px; padding: 6px;
     box-shadow: var(--shadow); animation: pop .16s ease;
