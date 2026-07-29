@@ -271,24 +271,47 @@ async function applyLogoURL(url) {
 
 // ---- galerie de suggestions : logos de marques (volontairement moins
 // "grand public" que Google/Netflix/Instagram, pour varier les icônes) ----
-const iconSuggestions = $("iconSuggestions");
-const SUGGESTED_BRANDS = [
+const iconSuggestions = $("iconSuggestions"), iconRefresh = $("iconRefresh");
+const SUGGESTED_BRANDS_POOL = [
   "notion.so", "figma.com", "linear.app", "trello.com",
   "todoist.com", "airtable.com", "miro.com", "asana.com",
   "clickup.com", "evernote.com", "pocket.com", "feedly.com",
   "buffer.com", "dribbble.com", "behance.net", "vimeo.com",
+  "letterboxd.com", "goodreads.com", "duolingo.com", "canva.com",
+  "zapier.com", "craft.do", "obsidian.md", "coda.io",
+  "monday.com", "basecamp.com", "typeform.com", "webflow.com",
+  "framer.com", "loom.com", "calendly.com", "intercom.com",
+  "codepen.io", "glitch.com", "vercel.com", "netlify.com",
+  "railway.app", "supabase.com", "postman.com", "raindrop.io",
 ];
+const SUGGESTIONS_SHOWN = 16;
+let shownBrands = pickBrands();
+function pickBrands() {
+  const pool = [...SUGGESTED_BRANDS_POOL];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, SUGGESTIONS_SHOWN);
+}
 function deselectIconSuggestion() {
   const sel = iconSuggestions.querySelector(".selected");
   if (sel) sel.classList.remove("selected");
 }
 function renderIconSuggestions() {
-  iconSuggestions.innerHTML = SUGGESTED_BRANDS.map((domain) => `
+  iconSuggestions.innerHTML = shownBrands.map((domain) => `
     <button type="button" class="icon-suggestion" data-domain="${domain}" title="Utiliser le logo de ${domain}">
       <img class="icon-suggestion-img" src="${logoDevURL(domain)}" alt="" loading="lazy"
         onerror="this.closest('.icon-suggestion').hidden = true" />
     </button>`).join("");
 }
+iconRefresh.addEventListener("click", () => {
+  shownBrands = pickBrands();
+  renderIconSuggestions();
+  iconRefresh.classList.remove("spin");
+  void iconRefresh.offsetWidth; // relance l'animation même si elle vient de tourner
+  iconRefresh.classList.add("spin");
+});
 iconSuggestions.addEventListener("click", async (e) => {
   const btn = e.target.closest(".icon-suggestion");
   if (!btn) return;
