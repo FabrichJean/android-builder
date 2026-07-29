@@ -43,7 +43,8 @@ type Build struct {
 	Error       string    `json:"error,omitempty"`
 	RunID       int64     `json:"run_id,omitempty"`
 	RunURL      string    `json:"run_url,omitempty"`
-	APKPath     string    `json:"apk_path,omitempty"` // chemin du fichier APK sur disque
+	APKPath     string    `json:"apk_path,omitempty"`    // chemin du fichier APK sur disque
+	SourcePath  string    `json:"source_path,omitempty"` // chemin du dist.zip source sur disque (mode bundle)
 	Steps       []Step    `json:"steps,omitempty"`    // étapes du build
 	Progress    int       `json:"progress"`           // 0-100
 	CurrentStep string    `json:"current_step,omitempty"`
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS builds (
 	run_id        INTEGER NOT NULL DEFAULT 0,
 	run_url       TEXT NOT NULL DEFAULT '',
 	apk_path      TEXT NOT NULL DEFAULT '',
+	source_path   TEXT NOT NULL DEFAULT '',
 	steps_json    TEXT NOT NULL DEFAULT '[]',
 	progress      INTEGER NOT NULL DEFAULT 0,
 	current_step  TEXT NOT NULL DEFAULT '',
@@ -95,6 +97,9 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	// Migration légère pour les bases créées avant l'ajout de source_path :
+	// erreur "duplicate column" ignorée si la colonne existe déjà.
+	db.Exec(`ALTER TABLE builds ADD COLUMN source_path TEXT NOT NULL DEFAULT ''`)
 	return &Store{db: db}, nil
 }
 
@@ -118,11 +123,11 @@ func (s *Store) insert(b *Build) error {
 	stepsJSON, _ := json.Marshal(b.Steps)
 	_, err := s.db.Exec(
 		`INSERT INTO builds (id, user_id, url, app_name, package, mode, splash_bg, has_icon,
-			status, error, run_id, run_url, apk_path, steps_json, progress, current_step,
+			status, error, run_id, run_url, apk_path, source_path, steps_json, progress, current_step,
 			created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		b.ID, b.UserID, b.URL, b.AppName, b.Package, b.Mode, b.SplashBg, boolToInt(b.HasIcon),
-		string(b.Status), b.Error, b.RunID, b.RunURL, b.APKPath, string(stepsJSON), b.Progress, b.CurrentStep,
+		string(b.Status), b.Error, b.RunID, b.RunURL, b.APKPath, b.SourcePath, string(stepsJSON), b.Progress, b.CurrentStep,
 		b.CreatedAt.UnixMilli(), b.UpdatedAt.UnixMilli(),
 	)
 	return err
@@ -142,7 +147,7 @@ func (s *Store) Get(id string) (*Build, bool) {
 func (s *Store) get(id string) (*Build, error) {
 	row := s.db.QueryRow(
 		`SELECT id, user_id, url, app_name, package, mode, splash_bg, has_icon,
-			status, error, run_id, run_url, apk_path, steps_json, progress, current_step,
+			status, error, run_id, run_url, apk_path, source_path, steps_json, progress, current_step,
 			created_at, updated_at
 		FROM builds WHERE id = ?`, id,
 	)
@@ -157,7 +162,7 @@ func (s *Store) List(userID string) ([]*Build, error) {
 	}
 	rows, err := s.db.Query(
 		`SELECT id, user_id, url, app_name, package, mode, splash_bg, has_icon,
-			status, error, run_id, run_url, apk_path, steps_json, progress, current_step,
+			status, error, run_id, run_url, apk_path, source_path, steps_json, progress, current_step,
 			created_at, updated_at
 		FROM builds WHERE user_id = ? ORDER BY created_at DESC LIMIT 200`, userID,
 	)
@@ -186,6 +191,15 @@ func (s *Store) APKPath(id string) (string, bool) {
 	return b.APKPath, true
 }
 
+// SourcePath renvoie le chemin du dist.zip source d'un build (mode bundle).
+func (s *Store) SourcePath(id string) (string, bool) {
+	b, ok := s.Get(id)
+	if !ok || b.SourcePath == "" {
+		return "", false
+	}
+	return b.SourcePath, true
+}
+
 // Update applique une mutation au build sous verrou (lecture -> fn -> écriture).
 func (s *Store) Update(id string, fn func(*Build)) {
 	s.mu.Lock()
@@ -199,10 +213,10 @@ func (s *Store) Update(id string, fn func(*Build)) {
 	stepsJSON, _ := json.Marshal(b.Steps)
 	s.db.Exec(
 		`UPDATE builds SET user_id=?, url=?, app_name=?, package=?, mode=?, splash_bg=?, has_icon=?,
-			status=?, error=?, run_id=?, run_url=?, apk_path=?, steps_json=?, progress=?, current_step=?,
+			status=?, error=?, run_id=?, run_url=?, apk_path=?, source_path=?, steps_json=?, progress=?, current_step=?,
 			updated_at=? WHERE id=?`,
 		b.UserID, b.URL, b.AppName, b.Package, b.Mode, b.SplashBg, boolToInt(b.HasIcon),
-		string(b.Status), b.Error, b.RunID, b.RunURL, b.APKPath, string(stepsJSON), b.Progress, b.CurrentStep,
+		string(b.Status), b.Error, b.RunID, b.RunURL, b.APKPath, b.SourcePath, string(stepsJSON), b.Progress, b.CurrentStep,
 		b.UpdatedAt.UnixMilli(), id,
 	)
 }
@@ -227,7 +241,7 @@ func scanBuild(row scanner) (*Build, error) {
 	var createdMs, updatedMs int64
 	err := row.Scan(
 		&b.ID, &b.UserID, &b.URL, &b.AppName, &b.Package, &b.Mode, &b.SplashBg, &hasIcon,
-		&b.Status, &b.Error, &b.RunID, &b.RunURL, &b.APKPath, &stepsJSON, &b.Progress, &b.CurrentStep,
+		&b.Status, &b.Error, &b.RunID, &b.RunURL, &b.APKPath, &b.SourcePath, &stepsJSON, &b.Progress, &b.CurrentStep,
 		&createdMs, &updatedMs,
 	)
 	if err != nil {

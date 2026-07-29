@@ -16,6 +16,7 @@ export const ICONS = {
   download: '<svg class="ic" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4"/><path d="M5 19h14"/></svg>',
   external: '<svg class="ic" viewBox="0 0 24 24"><path d="M14 5h5v5"/><path d="M19 5 10 14"/><path d="M8 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"/></svg>',
   offline:  '<svg class="ic" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="13" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>',
+  code:     '<svg class="ic" viewBox="0 0 24 24"><path d="M9 18 3 12l6-6"/><path d="M15 6l6 6-6 6"/></svg>',
 };
 
 export const STATUS = {

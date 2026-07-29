@@ -49,6 +49,10 @@ function bodyHTML(b) {
     ? `<a class="icon-btn primary" href="/api/builds/${b.id}/apk" title="Télécharger l'APK" download>${ICONS.download}</a>` : "";
   const runLink = b.run_url
     ? `<a class="icon-btn" href="${esc(b.run_url)}" target="_blank" rel="noopener" title="Voir le run">${ICONS.external}</a>` : "";
+  // Le code source (dist.zip) est conservé côté serveur pour tout build "bundle"
+  // (projet importé ou généré par IA), indépendamment du statut du build APK.
+  const sourceLink = b.mode === "bundle"
+    ? `<a class="icon-btn" href="/api/builds/${b.id}/source" title="Télécharger le code source" download>${ICONS.code}</a>` : "";
   const remove = `<button class="icon-btn" data-remove="${b.id}" title="Retirer de la liste">${ICONS.cross}</button>`;
   const subText = failed && b.error ? b.error
     : (b.mode === "bundle" ? `${b.url} · hors-ligne` : b.url);
@@ -60,7 +64,7 @@ function bodyHTML(b) {
         <p class="pcard-title">${esc(b.app_name)}</p>
         <p class="pcard-sub"${failed ? ' style="color:var(--err)"' : ''} title="${esc(subText)}">${sub}</p>
       </div>
-      <div class="actions">${download}${runLink}${remove}</div>
+      <div class="actions">${download}${sourceLink}${runLink}${remove}</div>
     </div>`;
 }
 function card(b) {

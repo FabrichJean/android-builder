@@ -98,6 +98,27 @@ func (s *Server) handleDownloadAPK(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
+// handleDownloadSource sert le dist.zip source d'un build en mode "bundle"
+// (projet importé manuellement ou généré par IA) — conservé sur disque à la
+// création du build, indépendamment du statut/de la réussite du build APK.
+func (s *Server) handleDownloadSource(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	b, ok := s.store.Get(id)
+	if !ok || !s.buildVisible(r, b) {
+		writeErr(w, http.StatusNotFound, "build introuvable")
+		return
+	}
+	path, ok := s.store.SourcePath(id)
+	if !ok {
+		writeErr(w, http.StatusNotFound, "code source indisponible")
+		return
+	}
+	filename := fmt.Sprintf("%s-%s-source.zip", sanitize(b.AppName), id)
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	http.ServeFile(w, r, path)
+}
+
 // handleListBuilds renvoie l'historique privé de l'utilisateur connecté.
 // Anonyme -> liste vide (l'interface retombe sur son historique localStorage).
 func (s *Server) handleListBuilds(w http.ResponseWriter, r *http.Request) {

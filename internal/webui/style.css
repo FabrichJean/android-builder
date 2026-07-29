@@ -993,7 +993,7 @@
 
   .pcard {
     position: relative;
-    background: var(--surface);
+    background: #000;
     border: 1px solid var(--border);
     border-radius: 14px;
     overflow: hidden;
@@ -1001,6 +1001,7 @@
     animation: rise .3s ease;
     transition: border-color .15s, transform .15s;
   }
+  :root[data-theme="light"] .pcard { background: #fff; }
   .pcard:hover { border-color: var(--border-2); transform: translateY(-2px); }
   .pcard-thumb { position: relative; height: 120px; display: grid; place-items: center; }
   .pcard-initial {
