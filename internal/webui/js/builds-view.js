@@ -181,14 +181,93 @@ $("tabs").addEventListener("click", (e) => {
 });
 searchEl.addEventListener("input", render);
 
-// Raccourci ⌘K / Ctrl+K : focus la recherche depuis n'importe où (sauf si on
-// tape déjà dans un autre champ), échap pour la relâcher.
+// ---- palette de recherche rapide (⌘K) : la barre de recherche de la
+// sidebar n'est plus qu'un déclencheur (readonly) — la saisie et les
+// résultats vivent dans ce modal, façon command palette. ----
+const cmdModal = $("cmdModal"), cmdInput = $("cmdInput"), cmdResults = $("cmdResults");
+let cmdSelected = 0;
+
+function cmdMatches(query) {
+  const q = query.trim().toLowerCase();
+  const list = q
+    ? builds.filter(b => `${b.app_name} ${b.url}`.toLowerCase().includes(q))
+    : builds.slice(0, 8);
+  return list.slice(0, 8);
+}
+function cmdRowHTML(b, i) {
+  const initial = ((b.app_name || "?").trim()[0] || "?").toUpperCase();
+  return `<div class="command-row${i === cmdSelected ? " selected" : ""}" data-id="${b.id}" data-index="${i}">
+    <div class="command-row-icon" style="${thumbStyle(b.app_name)}">${esc(initial)}</div>
+    <div class="command-row-text">
+      <div class="command-row-title">${esc(b.app_name)}</div>
+      <div class="command-row-sub">${esc(b.url)}</div>
+    </div>
+    ${i === cmdSelected ? '<span class="command-row-kbd">↵</span>' : ""}
+  </div>`;
+}
+function renderCmdResults() {
+  const matches = cmdMatches(cmdInput.value);
+  cmdSelected = matches.length ? Math.min(cmdSelected, matches.length - 1) : 0;
+  cmdResults.innerHTML = matches.length
+    ? matches.map((b, i) => cmdRowHTML(b, i)).join("")
+    : `<div class="command-empty">Aucun build ne correspond${cmdInput.value.trim() ? ` à « ${esc(cmdInput.value.trim())} »` : ""}.</div>`;
+  cmdResults.dataset.count = matches.length;
+}
+function openCmdModal() {
+  cmdModal.classList.add("open");
+  cmdSelected = 0;
+  cmdInput.value = "";
+  renderCmdResults();
+  cmdInput.focus();
+}
+function closeCmdModal() {
+  cmdModal.classList.remove("open");
+  searchEl.blur();
+}
+function selectCmdMatch(id) {
+  const b = builds.find(x => x.id === id);
+  closeCmdModal();
+  if (!b) return;
+  switchView("history");
+  searchEl.value = b.app_name;
+  render();
+  requestAnimationFrame(() => {
+    const card = buildsEl.querySelector(`.pcard[data-card="${id}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.add("flash");
+    setTimeout(() => card.classList.remove("flash"), 1200);
+  });
+}
+cmdInput.addEventListener("input", () => { cmdSelected = 0; renderCmdResults(); });
+cmdResults.addEventListener("click", (e) => {
+  const row = e.target.closest(".command-row");
+  if (row) selectCmdMatch(row.dataset.id);
+});
+cmdModal.addEventListener("click", (e) => { if (e.target === cmdModal) closeCmdModal(); });
+cmdInput.addEventListener("keydown", (e) => {
+  const count = +cmdResults.dataset.count || 0;
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (count) { cmdSelected = Math.min(count - 1, cmdSelected + 1); renderCmdResults(); }
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (count) { cmdSelected = Math.max(0, cmdSelected - 1); renderCmdResults(); }
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    const row = cmdResults.querySelector(`.command-row[data-index="${cmdSelected}"]`);
+    if (row) selectCmdMatch(row.dataset.id);
+  } else if (e.key === "Escape") {
+    closeCmdModal();
+  }
+});
+// Déclencheurs : clic sur la barre de recherche de la sidebar, ou ⌘K / Ctrl+K
+// depuis n'importe où dans l'app.
+searchEl.addEventListener("click", openCmdModal);
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
     e.preventDefault();
-    searchEl.focus();
-    searchEl.select();
-  } else if (e.key === "Escape" && document.activeElement === searchEl) {
-    searchEl.blur();
+    if (cmdModal.classList.contains("open")) closeCmdModal();
+    else openCmdModal();
   }
 });

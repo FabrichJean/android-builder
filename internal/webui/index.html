@@ -36,7 +36,7 @@
         </div>
 
         <label class="sb-search">
-          <input id="search" type="text" placeholder="Rechercher un build" />
+          <input id="search" type="text" placeholder="Rechercher un build" readonly />
           <kbd class="sb-search-kbd">⌘K</kbd>
           <svg class="ic" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="7" />
@@ -668,6 +668,27 @@
         </button>
       </div>
       <div class="active-list" id="activeList"></div>
+    </div>
+
+    <!-- palette de recherche rapide (⌘K) -->
+    <div class="modal command-modal" id="cmdModal">
+      <div class="modal-card command-card">
+        <label class="command-search">
+          <svg class="ic" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            id="cmdInput"
+            placeholder="Rechercher un build…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <kbd class="sb-search-kbd">Échap</kbd>
+        </label>
+        <div class="command-results" id="cmdResults"></div>
+      </div>
     </div>
 
     <!-- modal de recadrage d'icône -->
