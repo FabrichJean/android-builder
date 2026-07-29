@@ -78,20 +78,35 @@
     vertical-align: -0.22em;
   }
 
-  /* bascule thème clair/sombre : flottant, joignable que la sidebar soit
-     visible, réduite ou masquée (anonyme). */
+  /* bascule thème clair/sombre : deux variantes du même bouton (icônes et
+     logique de bascule communes, cf. theme.js qui cible tout [data-theme-toggle]).
+     --floating : mode anonyme, sidebar masquée, doit rester joignable seule.
+     --corner : accrochée au coin haut-droit de la carte compte, déborde de
+     son bord (cf. .account-card, position: relative). */
   .theme-toggle {
-    position: fixed; bottom: 20px; left: 20px; z-index: 40;
-    display: grid; place-items: center; width: 40px; height: 40px;
+    display: grid; place-items: center;
     background: linear-gradient(180deg, var(--surface), var(--surface-2));
-    border: 1px solid var(--border-2); border-radius: 50%; color: var(--muted);
-    cursor: pointer; box-shadow: 0 10px 26px -12px rgba(0,0,0,0.5);
-    transition: color .15s, border-color .15s;
+    border: 1px solid var(--border-2); color: var(--muted);
+    cursor: pointer; transition: color .15s, border-color .15s;
   }
   .theme-toggle:hover { color: var(--sand); border-color: var(--sand); }
   .theme-toggle .theme-ic-moon { display: none; }
   :root[data-theme="light"] .theme-toggle .theme-ic-sun { display: none; }
   :root[data-theme="light"] .theme-toggle .theme-ic-moon { display: block; }
+
+  .theme-toggle--floating {
+    position: fixed; bottom: 20px; left: 20px; z-index: 40;
+    width: 40px; height: 40px; border-radius: 50%;
+    box-shadow: 0 10px 26px -12px rgba(0,0,0,0.5);
+  }
+  .theme-toggle--floating[hidden] { display: none; }
+
+  .theme-toggle--corner {
+    position: absolute; top: -8px; right: -8px; z-index: 2;
+    width: 24px; height: 24px; border-radius: 50%;
+    box-shadow: 0 4px 10px -4px rgba(0,0,0,0.5);
+  }
+  .theme-toggle--corner .ic { width: 13px; height: 13px; }
 
   /* ---- coquille app (sidebar + contenu), inspirée d'un shell type bolt.new ---- */
   .app-shell { display: flex; min-height: 100vh; }
@@ -126,6 +141,11 @@
   .sb-search input { flex: 1; min-width: 0; border: none; background: none; box-shadow: none !important; padding: 0; font-size: 13px; color: var(--text); }
 
   .sb-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+
+  /* position: relative ancre le bouton thème en coin (.theme-toggle--corner) ;
+     margin-top laisse la place à son débordement au-dessus de la carte. */
+  .account { margin-top: 8px; margin-bottom: 4px; }
+  .account-card { position: relative; margin-top: 8px; }
   .sb-item {
     display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
     background: none; border: none; border-radius: 9px; padding: 10px;
@@ -162,6 +182,7 @@
   .sidebar.collapsed .sb-item span,
   .sidebar.collapsed .account-name,
   .sidebar.collapsed .account-chev,
+  .sidebar.collapsed .account-credits-badge,
   .sidebar.collapsed .account-login span { display: none; }
   .sidebar.collapsed .sb-item { justify-content: center; }
   .sidebar.collapsed .account-chip { justify-content: center; min-width: 0; padding: 7px; }
@@ -174,6 +195,7 @@
     .sidebar:not(.expanded) .sb-item span,
     .sidebar:not(.expanded) .account-name,
     .sidebar:not(.expanded) .account-chev,
+    .sidebar:not(.expanded) .account-credits-badge,
     .sidebar:not(.expanded) .account-login span { display: none; }
     .sidebar:not(.expanded) .sb-item { justify-content: center; }
     .sidebar:not(.expanded) .account-chip { justify-content: center; min-width: 0; padding: 7px; }
@@ -195,7 +217,6 @@
   .hero-inner { max-width: 680px; margin: 0 auto; }
 
   /* ---- connexion Google (optionnelle) ---- */
-  .account { margin: 2px 0 12px; }
   .account[hidden], .account-login[hidden], .account-user[hidden], .account-menu[hidden] { display: none; }
   .account-login {
     display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
@@ -246,6 +267,19 @@
   }
   .account-chev { color: var(--faint); transition: transform .2s; flex: none; }
 
+  /* Badge crédits IA sur le chip du compte : visible sans ouvrir le menu ; le
+     détail (jauge + explication) reste dans le dropdown. */
+  .account-credits-badge[hidden] { display: none; }
+  .account-credits-badge {
+    display: flex; align-items: center; gap: 3px; flex: none;
+    font-size: 11px; font-weight: 700; line-height: 1;
+    color: var(--sand); background: var(--sand-soft);
+    border: 1px solid var(--border-2); border-radius: 999px;
+    padding: 3px 7px 3px 6px;
+  }
+  .account-credits-badge .ic { width: 12px; height: 12px; }
+  .account-credits-badge.empty { color: var(--err); border-color: rgba(221,139,120,0.4); }
+
   .account-menu {
     position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 7;
     background: linear-gradient(180deg, var(--surface), var(--surface-2));
@@ -258,6 +292,39 @@
     color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600;
   }
   .account-menu-item:hover { background: rgba(221,139,120,0.12); color: var(--err); }
+
+  /* ---- crédits IA (menu du compte) : 5 crédits/jour = 5000 tokens, remis à
+     zéro chaque nuit ; affiché avec une jauge + une explication courte. ---- */
+  .account-credits[hidden] { display: none; }
+  .account-credits {
+    padding: 10px 10px 11px; margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-2);
+  }
+  .account-credits-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    margin-bottom: 7px;
+  }
+  .account-credits-label {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--faint);
+  }
+  .account-credits-count {
+    font-size: 13px; font-weight: 700; color: var(--sand);
+  }
+  .account-credits-track {
+    height: 6px; border-radius: 4px; background: var(--well);
+    border: 1px solid var(--border-2); overflow: hidden;
+  }
+  .account-credits-fill {
+    display: block; height: 100%; border-radius: 4px;
+    background: var(--gold-grad, var(--sand));
+    transition: width .25s ease;
+  }
+  .account-credits-track.empty .account-credits-fill { background: var(--err); }
+  .account-credits-note {
+    margin: 8px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--faint);
+  }
+  .account-credits-note strong { color: var(--text); font-weight: 650; }
   .pill-badge {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: 12.5px; font-weight: 600; color: var(--sand);

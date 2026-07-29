@@ -22,6 +22,40 @@ async function loadServerHistory() {
   } catch { /* API indisponible : on garde l'historique local */ }
 }
 
+// Jauge de crédits IA dans le menu du compte : 5 crédits/jour = 5000 tokens
+// (par défaut, valeurs réelles renvoyées par le serveur), remis à zéro chaque
+// nuit. Masquée si la génération IA n'est pas proposée à ce compte.
+function renderCredits(tokensRemaining, dailyBudget, creditsPerDay) {
+  const badge = $("accountCreditsBadge"), box = $("accountCredits");
+  if (tokensRemaining == null || !dailyBudget) { badge.hidden = true; box.hidden = true; return; }
+  const tokensPerCredit = dailyBudget / (creditsPerDay || 1);
+  const creditsRemaining = Math.max(0, Math.min(creditsPerDay, Math.round(tokensRemaining / tokensPerCredit)));
+  const pct = Math.max(0, Math.min(100, Math.round(tokensRemaining * 100 / dailyBudget)));
+
+  // Badge sur le chip (icône pièce + nombre restant, toujours visible sans
+  // ouvrir le menu — le détail complet reste dans le dropdown).
+  badge.hidden = false;
+  $("accountCreditsBadgeCount").textContent = creditsRemaining;
+  badge.classList.toggle("empty", tokensRemaining <= 0);
+
+  // Détail (jauge + explication) : reste dans le dropdown existant.
+  box.hidden = false;
+  $("accountCreditsCount").textContent = `${creditsRemaining} / ${creditsPerDay}`;
+  $("accountCreditsFill").style.width = `${pct}%`;
+  $("accountCreditsFill").parentElement.classList.toggle("empty", tokensRemaining <= 0);
+  $("accountCreditsBudget").textContent = `${creditsPerDay} crédits (${dailyBudget} tokens)`;
+}
+
+// Rappelé après chaque génération (succès, échec, refus...) pour que la jauge
+// reflète la consommation réelle sans attendre un refresh de page.
+export async function refreshAccountCredits() {
+  try {
+    const res = await fetch("/api/me");
+    const data = await res.json();
+    if (data.logged_in) renderCredits(data.gen_tokens_remaining, data.gen_daily_token_budget, data.gen_credits_per_day);
+  } catch { /* API indisponible : la jauge garde sa dernière valeur connue */ }
+}
+
 // Affiche la vraie photo de profil Google ; repli sur l'initiale du nom/email
 // si aucune photo n'est fournie ou si son chargement échoue.
 function setAvatar(user) {
@@ -48,6 +82,7 @@ export async function initAccount() {
     $("accountName").textContent = data.user.name || data.user.email || "Compte";
     setAvatar(data.user);
     setLoggedInMode(!!data.gen, !!data.gen_banned);
+    renderCredits(data.gen_tokens_remaining, data.gen_daily_token_budget, data.gen_credits_per_day);
     await loadServerHistory();
   } catch {
     // API indisponible : on retombe sur le mode anonyme (historique local).
@@ -87,6 +122,9 @@ function setAnonymousMode(canLogin) {
   setGenNeedsLogin(canLogin);
   genToggle.title = "Connecte-toi avec Google pour générer une app par IA";
   $("sidebar").hidden = true;
+  // Sidebar masquée : la bascule de thème fusionnée dans son pied n'est plus
+  // joignable, on rallume la version flottante indépendante.
+  $("themeToggleFloating").hidden = false;
   $("anonTopbar").hidden = !canLogin;
   setRecentCount(Infinity);
   $("recentViewAll").hidden = true;
@@ -112,6 +150,9 @@ function setLoggedInMode(genAvailable, genBanned) {
     history.replaceState(null, "", location.pathname);
   }
   $("sidebar").hidden = false;
+  // Sidebar visible : la bascule flottante fait doublon avec celle du pied de
+  // sidebar (fusionnée avec la puce de compte), on la masque.
+  $("themeToggleFloating").hidden = true;
   $("anonTopbar").hidden = true;
   setRecentCount(6);
   $("recentViewAll").hidden = false;

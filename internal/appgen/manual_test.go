@@ -177,9 +177,10 @@ func TestManualAmbiguousRejection(t *testing.T) {
 	}
 }
 
-// TestManualBanAfterRepeatedRejections vérifie que 3 refus successifs (2
-// tolérés, le 3e bannit) bloquent le compte, et qu'une tentative suivante —
-// même légitime — est bloquée sans même appeler le CLI (pas de coût en tokens).
+// TestManualBanAfterRepeatedRejections vérifie que maxRejections refus
+// successifs bannissent le compte dès le dernier d'entre eux, et qu'une
+// tentative suivante — même légitime — est bloquée sans même appeler le CLI
+// (pas de coût en tokens).
 func TestManualBanAfterRepeatedRejections(t *testing.T) {
 	if os.Getenv("APPGEN_MANUAL") != "1" {
 		t.Skip("test manuel (vraie invocation claude CLI) — définir APPGEN_MANUAL=1 pour l'exécuter")
@@ -193,7 +194,7 @@ func TestManualBanAfterRepeatedRejections(t *testing.T) {
 	offTopic := "quelle est la capitale de la France ?"
 
 	var last *Session
-	for i := 1; i <= maxRejections+1; i++ {
+	for i := 1; i <= maxRejections; i++ {
 		s, err := m.Prepare(context.Background(), userID, offTopic)
 		if err != nil {
 			t.Fatalf("Prepare #%d: %v", i, err)
@@ -202,7 +203,7 @@ func TestManualBanAfterRepeatedRejections(t *testing.T) {
 		last = s
 	}
 	if last.Status != StatusBanned {
-		t.Fatalf("après %d refus, statut attendu=%s, obtenu=%s", maxRejections+1, StatusBanned, last.Status)
+		t.Fatalf("après %d refus, statut attendu=%s, obtenu=%s", maxRejections, StatusBanned, last.Status)
 	}
 	if !m.IsBanned(userID) {
 		t.Fatal("IsBanned devrait renvoyer true après bannissement")

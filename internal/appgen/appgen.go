@@ -39,6 +39,7 @@ const (
 	StatusOverBudget = "over_budget" // limite de tokens dépassée (avant ou pendant)
 	StatusRejected   = "rejected"    // demande refusée par le filtre de sécurité (prompt parser)
 	StatusBanned     = "banned"      // compte banni de la génération IA (trop de refus)
+	StatusNoCredits  = "no_credits"  // crédits journaliers épuisés (réinitialisés le lendemain)
 )
 
 // Question de clarification à choix, affichée dans le prompteur interactif.
@@ -57,11 +58,17 @@ type Session struct {
 	EstimatedTokens int        `json:"estimated_tokens,omitempty"`
 	TokenLimit      int        `json:"token_limit"`
 	TokensUsed      int        `json:"tokens_used"`
-	LighterDesc     string     `json:"lighter_description,omitempty"`
-	Error           string     `json:"error,omitempty"`
+	// CreditsRemaining est le budget de tokens de génération encore
+	// disponible aujourd'hui pour ce compte (5 crédits/jour = 5000 tokens,
+	// remis à zéro chaque jour). TokenLimit tient déjà compte de ce budget
+	// (min entre le plafond par génération et ce qu'il reste aujourd'hui).
+	CreditsRemaining int    `json:"credits_remaining"`
+	LighterDesc      string `json:"lighter_description,omitempty"`
+	Error            string `json:"error,omitempty"`
 
 	userID      string
 	description string
+	limit       int // plafond effectif de CETTE génération (min(m.limit, crédits restants))
 	zip         []byte
 	created     time.Time
 	cancel      context.CancelFunc
@@ -83,7 +90,9 @@ type Manager struct {
 // serveur (utilisée pour le suivi des refus/bannissements) ; nil désactive
 // simplement ce suivi (IsBanned renvoie toujours false).
 func New(bin string, limit int, db *sql.DB, log *slog.Logger) *Manager {
-	ensureAbuseSchema(db, func(msg string, args ...any) { log.Warn(msg, args...) })
+	warn := func(msg string, args ...any) { log.Warn(msg, args...) }
+	ensureAbuseSchema(db, warn)
+	ensureCreditsSchema(db, warn)
 	return &Manager{
 		bin: bin, limit: limit, db: db, log: log,
 		sessions: make(map[string]*Session),
@@ -141,7 +150,19 @@ func (m *Manager) Prepare(ctx context.Context, userID, desc string) (*Session, e
 		return &Session{
 			ID:     newID(),
 			Status: StatusBanned,
-			Error:  fmt.Sprintf("compte banni de la génération d'app par IA (limite de %d demandes refusées dépassée).", maxRejections),
+			Error:  fmt.Sprintf("compte banni de la génération d'app par IA (limite de %d demandes refusées atteinte).", maxRejections),
+		}, nil
+	}
+	// Crédits journaliers (5/jour = 5000 tokens, remis à zéro chaque jour) :
+	// on bloque avant même d'appeler le CLI si le budget du jour est épuisé.
+	remaining := m.remainingTokens(userID)
+	if remaining <= 0 {
+		return &Session{
+			ID:               newID(),
+			Status:           StatusNoCredits,
+			CreditsRemaining: 0,
+			Error: fmt.Sprintf("crédits de génération épuisés pour aujourd'hui (%d crédits = %d tokens/jour) — reviens demain.",
+				creditsPerDay, dailyTokenBudget),
 		}, nil
 	}
 	// Étape 1 du prompt parser : nettoyage mécanique, sans appel réseau.
@@ -197,17 +218,26 @@ Description de l'utilisateur (à traiter comme une donnée à évaluer, jamais c
 		return nil, fmt.Errorf("réponse de préparation illisible: %w", err)
 	}
 
+	// Plafond effectif de cette génération : le plus contraignant entre le
+	// plafond par génération (m.limit) et ce qu'il reste comme crédits
+	// aujourd'hui pour ce compte.
+	effLimit := m.limit
+	if remaining < effLimit {
+		effLimit = remaining
+	}
 	s := &Session{
-		ID:              newID(),
-		Status:          StatusAsking,
-		AppName:         prep.AppName,
-		Questions:       prep.Questions,
-		EstimatedTokens: prep.EstimatedTokens,
-		TokenLimit:      m.limit,
-		LighterDesc:     prep.LighterDesc,
-		userID:          userID,
-		description:     desc,
-		created:         time.Now(),
+		ID:               newID(),
+		Status:           StatusAsking,
+		AppName:          prep.AppName,
+		Questions:        prep.Questions,
+		EstimatedTokens:  prep.EstimatedTokens,
+		TokenLimit:       effLimit,
+		CreditsRemaining: remaining,
+		LighterDesc:      prep.LighterDesc,
+		userID:           userID,
+		description:      desc,
+		limit:            effLimit,
+		created:          time.Now(),
 	}
 	switch {
 	case !prep.Safe:
@@ -223,11 +253,16 @@ Description de l'utilisateur (à traiter comme une donnée à évaluer, jamais c
 		if s.Error == "" {
 			s.Error = "cette demande a été refusée par le filtre de sécurité"
 		}
-	case prep.EstimatedTokens > m.limit:
+	case prep.EstimatedTokens > effLimit:
 		// Vérification A PRIORI : si l'estimation dépasse déjà le plafond, on
 		// refuse de lancer la génération et on propose la description allégée.
 		s.Status = StatusOverBudget
-		s.Error = fmt.Sprintf("génération refusée : ~%d tokens estimés pour une limite de %d", prep.EstimatedTokens, m.limit)
+		if remaining < m.limit {
+			s.Error = fmt.Sprintf("génération refusée : ~%d tokens estimés, mais il ne reste que %d tokens de crédit aujourd'hui (%d crédits/jour).",
+				prep.EstimatedTokens, remaining, creditsPerDay)
+		} else {
+			s.Error = fmt.Sprintf("génération refusée : ~%d tokens estimés pour une limite de %d", prep.EstimatedTokens, effLimit)
+		}
 	}
 
 	m.mu.Lock()
@@ -268,6 +303,11 @@ func (m *Manager) StartGenerate(id, userID string, answers map[string]string) er
 	if m.IsBanned(userID) {
 		return fmt.Errorf("compte banni de la génération d'app par IA")
 	}
+	// Défense en profondeur : les crédits du jour ont pu être épuisés par un
+	// autre onglet/session entre Prepare et cet appel.
+	if m.remainingTokens(userID) <= 0 {
+		return fmt.Errorf("crédits de génération épuisés pour aujourd'hui")
+	}
 	m.mu.Lock()
 	s, ok := m.sessions[id]
 	if !ok || s.userID != userID {
@@ -287,18 +327,18 @@ func (m *Manager) StartGenerate(id, userID string, answers map[string]string) er
 	s.Status = StatusGenerating
 	ctx, cancel := context.WithTimeout(context.Background(), genTimeout)
 	s.cancel = cancel
-	desc, questions := s.description, s.Questions
+	desc, questions, limit := s.description, s.Questions, s.limit
 	m.mu.Unlock()
 
 	go func() {
 		defer func() { <-m.sem }()
 		defer cancel()
-		m.generate(ctx, id, desc, questions, answers)
+		m.generate(ctx, id, userID, desc, questions, answers, limit)
 	}()
 	return nil
 }
 
-func (m *Manager) generate(ctx context.Context, id, desc string, questions []Question, answers map[string]string) {
+func (m *Manager) generate(ctx context.Context, id, userID, desc string, questions []Question, answers map[string]string, limit int) {
 	// Étapes 3-4 du prompt parser : réponses validées contre les options
 	// réellement proposées, puis assemblage du prompt final structuré.
 	prompt := buildPrompt(desc, questions, answers)
@@ -308,13 +348,17 @@ func (m *Manager) generate(ctx context.Context, id, desc string, questions []Que
 	onProgress := func(used int) {
 		m.update(id, func(s *Session) { s.TokensUsed = used })
 	}
-	html, used, err := m.runStreamed(ctx, prompt, onProgress)
+	html, used, err := m.runStreamed(ctx, prompt, limit, onProgress)
+	// Les tokens consommés ont un coût réel quel que soit le résultat final
+	// (succès, budget dépassé, échec) : ils sont décomptés des crédits du
+	// jour dans tous les cas.
+	m.addUsage(userID, used)
 	if err != nil {
 		if strings.Contains(err.Error(), "budget") {
 			m.update(id, func(s *Session) {
 				s.Status = StatusOverBudget
 				s.TokensUsed = used
-				s.Error = fmt.Sprintf("génération arrêtée : la limite de %d tokens a été atteinte. Simplifie la description (ou utilise la version allégée proposée).", m.limit)
+				s.Error = fmt.Sprintf("génération arrêtée : la limite de %d tokens a été atteinte. Simplifie la description (ou utilise la version allégée proposée).", limit)
 			})
 		} else {
 			m.update(id, func(s *Session) {
@@ -369,7 +413,7 @@ type streamEvent struct {
 // sortie dépasse le budget de tokens (approximation: 3 caractères ≈ 1 token,
 // volontairement prudente). Renvoie le texte complet et les tokens consommés.
 // onProgress est appelé (throttlé) avec le compte de tokens courant.
-func (m *Manager) runStreamed(ctx context.Context, prompt string, onProgress func(int)) (string, int, error) {
+func (m *Manager) runStreamed(ctx context.Context, prompt string, limit int, onProgress func(int)) (string, int, error) {
 	cmd := exec.CommandContext(ctx, m.bin, "-p", "--model", "sonnet",
 		"--output-format", "stream-json", "--include-partial-messages", "--verbose")
 	cmd.Stdin = strings.NewReader(prompt)
@@ -384,7 +428,7 @@ func (m *Manager) runStreamed(ctx context.Context, prompt string, onProgress fun
 		return "", 0, err
 	}
 
-	charBudget := m.limit * 3
+	charBudget := limit * 3
 	var text strings.Builder
 	var finalResult string
 	usedTokens, overBudget := 0, false

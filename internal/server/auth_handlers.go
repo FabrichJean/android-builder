@@ -37,6 +37,11 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		// Compte banni de la génération IA (trop de demandes refusées) : le
 		// reste du service (builds URL/projet, historique) reste utilisable.
 		"gen_banned": s.gen.IsBanned(u.ID),
+		// Crédits journaliers de génération IA (remis à zéro chaque jour) :
+		// tokens encore disponibles aujourd'hui et budget total du jour.
+		"gen_tokens_remaining":   s.gen.RemainingTokens(u.ID),
+		"gen_daily_token_budget": s.gen.DailyTokenBudget(),
+		"gen_credits_per_day":    s.gen.CreditsPerDay(),
 	})
 }
 
