@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -289,23 +290,38 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	displayURL := appURL
 	appAssetURL := appURL
 	mode := "url"
+	var sourcePath string
 	if bundle {
 		mode = "bundle"
 		displayURL = distName
 		// Servi via WebViewAssetLoader (domaine virtuel https) : gère les chemins
 		// absolus des SPA et permet le chargement des modules ES.
 		appAssetURL = "https://appassets.androidplatform.net/index.html"
+		// Conserve le dist original sur disque : contrairement à l'APK (produit
+		// par le workflow), c'est le seul endroit où ce code source persiste au-delà
+		// de la release GitHub temporaire (supprimée après le build) — permet de
+		// le retélécharger plus tard (notamment pour les projets générés par IA).
+		sourcePath = filepath.Join(s.cfg.Releases, "sources", id+".zip")
+		if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+			writeErr(w, http.StatusInternalServerError, "écriture du code source impossible: "+err.Error())
+			return
+		}
+		if err := os.WriteFile(sourcePath, distData, 0o644); err != nil {
+			writeErr(w, http.StatusInternalServerError, "écriture du code source impossible: "+err.Error())
+			return
+		}
 	}
 	build := &buildstore.Build{
-		ID:       id,
-		UserID:   s.currentUserID(r),
-		URL:      displayURL,
-		AppName:  appName,
-		Package:  pkg,
-		Mode:     mode,
-		SplashBg: splashBg,
-		HasIcon:  iconData != nil,
-		Status:   buildstore.StatusPending,
+		ID:         id,
+		UserID:     s.currentUserID(r),
+		URL:        displayURL,
+		AppName:    appName,
+		Package:    pkg,
+		Mode:       mode,
+		SplashBg:   splashBg,
+		HasIcon:    iconData != nil,
+		SourcePath: sourcePath,
+		Status:     buildstore.StatusPending,
 	}
 	if err := s.store.Create(build); err != nil {
 		writeErr(w, http.StatusInternalServerError, "enregistrement du build impossible: "+err.Error())

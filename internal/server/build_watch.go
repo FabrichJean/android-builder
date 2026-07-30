@@ -38,7 +38,7 @@ func (s *Server) watch(id, runName string, dispatchedAt time.Time, cleanup func(
 		}
 		select {
 		case <-ctx.Done():
-		case <-time.After(5 * time.Second):
+		case <-time.After(2 * time.Second):
 		}
 	}
 

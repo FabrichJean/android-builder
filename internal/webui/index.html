@@ -36,11 +36,12 @@
         </div>
 
         <label class="sb-search">
+          <input id="search" type="text" placeholder="Rechercher un build" readonly />
+          <kbd class="sb-search-kbd">⌘K</kbd>
           <svg class="ic" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.35-4.35" />
           </svg>
-          <input id="search" type="text" placeholder="Rechercher un build" />
         </label>
 
         <!-- connexion Google (optionnelle) : masquée tant que non configurée -->
@@ -264,6 +265,41 @@
                 <form id="form" novalidate>
                   <!-- entrée unifiée : URL ou glisser-déposer, façon barre de prompt -->
                   <div class="prompt-box" id="dropZone">
+                    <!-- résumé de la source importée : remplace visuellement le prompteur en mode projet -->
+                    <div class="section" id="summarySection" hidden>
+                      <div class="section-label">Source</div>
+                      <div class="pb-project" id="projectRow">
+                        <svg class="ic pb-project-ic" viewBox="0 0 24 24">
+                          <path d="M21 8.5 12 4 3 8.5 12 13l9-4.5z" />
+                          <path d="M3 8.5v7L12 20l9-4.5v-7" />
+                          <path d="M12 13v7" />
+                        </svg>
+                        <span class="pb-project-name" id="projectName"></span>
+                        <button
+                          type="button"
+                          class="pb-project-edit"
+                          id="projectEdit"
+                          title="Éditer le code du projet"
+                        >
+                          <svg class="ic" viewBox="0 0 24 24">
+                            <path d="M12 20h9" />
+                            <path
+                              d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="pb-project-clear"
+                          id="projectClear"
+                          title="Changer de source"
+                        >
+                          <svg class="ic" viewBox="0 0 24 24">
+                            <path d="M18 6 6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                     <textarea
                       id="url"
                       class="prompt-input"
@@ -364,29 +400,6 @@
                   <div class="gen-panel" id="genPanel" hidden></div>
                   <div class="form-error" id="formError"></div>
 
-                  <!-- résumé de la source importée -->
-                  <div class="section" id="summarySection" hidden>
-                    <div class="section-label">Source</div>
-                    <div class="pb-project" id="projectRow">
-                      <svg class="ic pb-project-ic" viewBox="0 0 24 24">
-                        <path d="M21 8.5 12 4 3 8.5 12 13l9-4.5z" />
-                        <path d="M3 8.5v7L12 20l9-4.5v-7" />
-                        <path d="M12 13v7" />
-                      </svg>
-                      <span class="pb-project-name" id="projectName"></span>
-                      <button
-                        type="button"
-                        class="pb-project-clear"
-                        id="projectClear"
-                        title="Changer de source"
-                      >
-                        <svg class="ic" viewBox="0 0 24 24">
-                          <path d="M18 6 6 18M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-
                   <!-- nom de l'app -->
                   <div class="section">
                     <label class="section-label" for="name"
@@ -433,15 +446,59 @@
                     <div class="custom-panel" id="customPanel" hidden>
                       <div class="appearance">
                         <div class="appearance-controls">
-                          <button
-                            type="button"
-                            class="icon-tile"
-                            id="iconTile"
-                            title="Choisir une icône"
-                          >
-                            <span class="icon-img" id="iconImg"></span>
-                            <span class="icon-edit">Icône</span>
-                          </button>
+                          <div class="icon-picker" id="iconPicker">
+                            <button
+                              type="button"
+                              class="icon-tile"
+                              id="iconTile"
+                              title="Choisir une icône"
+                            >
+                              <span class="icon-img" id="iconImg"></span>
+                              <span class="icon-edit">Icône</span>
+                            </button>
+                            <div class="icon-popover">
+                              <span class="icon-popover-label">Logo de la marque</span>
+                              <div class="icon-brand-row">
+                                <input
+                                  type="text"
+                                  id="iconBrandQuery"
+                                  placeholder="ex. Stripe, exemple.com…"
+                                  autocomplete="off"
+                                  spellcheck="false"
+                                />
+                              </div>
+                              <div class="icon-brand-preview" id="iconBrandPreview" hidden>
+                                <button
+                                  type="button"
+                                  class="icon-brand-btn"
+                                  id="iconBrandApply"
+                                  title="Utiliser ce logo"
+                                >
+                                  <img id="iconBrandImg" alt="" />
+                                </button>
+                              </div>
+                              <div class="icon-popover-row">
+                                <span class="icon-popover-label">Suggestions</span>
+                                <button
+                                  type="button"
+                                  class="icon-refresh"
+                                  id="iconRefresh"
+                                  title="Voir d'autres suggestions"
+                                >
+                                  <svg class="ic" viewBox="0 0 24 24">
+                                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                    <path d="M21 3v6h-6" />
+                                  </svg>
+                                </button>
+                              </div>
+                              <div class="icon-suggestions" id="iconSuggestions"></div>
+                              <div class="icon-popover-attrib">
+                                <a href="https://logo.dev" target="_blank" rel="noopener"
+                                  >Logos via logo.dev</a
+                                >
+                              </div>
+                            </div>
+                          </div>
                           <div class="splash-ctl">
                             <span class="mini-label">Fond du splash</span>
                             <div class="color-row">
@@ -626,6 +683,27 @@
       <div class="active-list" id="activeList"></div>
     </div>
 
+    <!-- palette de recherche rapide (⌘K) -->
+    <div class="modal command-modal" id="cmdModal">
+      <div class="modal-card command-card">
+        <label class="command-search">
+          <svg class="ic" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            id="cmdInput"
+            placeholder="Rechercher un build…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <kbd class="sb-search-kbd">Échap</kbd>
+        </label>
+        <div class="command-results" id="cmdResults"></div>
+      </div>
+    </div>
+
     <!-- modal de recadrage d'icône -->
     <div class="modal" id="cropModal">
       <div class="modal-card">
@@ -648,6 +726,58 @@
           </button>
           <button type="button" class="btn-gold" id="cropOk">Valider</button>
         </div>
+      </div>
+    </div>
+
+    <!-- modal de détail d'un build : contenu injecté dynamiquement (builds-view.js) -->
+    <div class="modal" id="detailModal">
+      <div class="modal-card detail-card" id="detailCard"></div>
+    </div>
+
+    <!-- menu d'actions groupées d'une carte (bouton ⋯) : un seul élément
+         partagé, positionné en JS (position: fixed) pour échapper au
+         overflow:hidden des cartes (arrondi de la vignette). -->
+    <div class="card-menu" id="cardMenu" hidden></div>
+
+    <!-- modal de l'éditeur de code du dist : toujours en thème sombre (indépendant
+         du thème clair/sombre du reste de l'app), sans gros boutons — Ctrl/Cmd+S
+         enregistre le fichier actif, Échap/× ferme (avec confirmation s'il y a
+         des changements à appliquer au projet). -->
+    <div class="modal" id="editorModal">
+      <div class="modal-card editor-card">
+        <div class="editor-titlebar">
+          <h3 id="editorTitle">Éditer le code</h3>
+          <button type="button" class="editor-close" id="editorCancel" title="Fermer (Échap)">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div class="editor-body">
+          <div class="editor-sidebar">
+            <div class="editor-sidebar-head">Explorateur</div>
+            <div class="editor-tree" id="editorTree"></div>
+          </div>
+          <div class="editor-pane">
+            <div class="editor-tabs" id="editorTabs"></div>
+            <div class="editor-cm" id="editorCm"></div>
+            <div class="editor-status">
+              <span id="editorStatusLang"></span>
+              <span id="editorStatusPos"></span>
+              <span class="editor-status-hint">⌘S enregistrer le fichier · Échap fermer</span>
+            </div>
+          </div>
+          <div class="editor-confirm" id="editorConfirm" hidden>
+            <div class="editor-confirm-box">
+              <p class="editor-confirm-title">Appliquer les modifications ?</p>
+              <p class="editor-confirm-sub">Le prochain build utilisera cette version du code.</p>
+              <div class="editor-confirm-actions">
+                <button type="button" class="editor-confirm-btn" id="editorConfirmStay">Continuer l'édition</button>
+                <button type="button" class="editor-confirm-btn ghost" id="editorConfirmDiscard">Ignorer les modifs</button>
+                <button type="button" class="editor-confirm-btn primary" id="editorConfirmApply">Appliquer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-error" id="editorError"></div>
       </div>
     </div>
 

@@ -56,7 +56,7 @@ function crc32(buf) {
   for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
-function makeZip(files) {
+export function makeZip(files) {
   const enc = new TextEncoder(), parts = [], central = [];
   let offset = 0;
   for (const f of files) {
@@ -79,6 +79,50 @@ function makeZip(files) {
   eocd.setUint16(8, files.length, true); eocd.setUint16(10, files.length, true);
   eocd.setUint32(12, cdSize, true); eocd.setUint32(16, offset, true);
   return new Blob([...parts, ...central, new Uint8Array(eocd.buffer)], { type: "application/zip" });
+}
+
+// Lit un zip (méthode "store" ou "deflate") en mémoire -> liste {path, data}.
+// Utilisé par l'éditeur de code pour ouvrir un dist déjà zippé (projet importé
+// en .zip, dist.zip généré par IA côté serveur, ou source.zip d'un build existant).
+export async function readZip(blob) {
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 65536); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("Archive zip invalide.");
+  const count = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  const dec = new TextDecoder();
+  const files = [];
+  for (let i = 0; i < count; i++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) throw new Error("Archive zip invalide (entrée centrale).");
+    const method = dv.getUint16(off + 10, true);
+    const compSize = dv.getUint32(off + 20, true);
+    const nameLen = dv.getUint16(off + 28, true);
+    const extraLen = dv.getUint16(off + 30, true);
+    const commentLen = dv.getUint16(off + 32, true);
+    const lhOff = dv.getUint32(off + 42, true);
+    const name = dec.decode(buf.subarray(off + 46, off + 46 + nameLen));
+    off += 46 + nameLen + extraLen + commentLen;
+    if (name.endsWith("/")) continue; // dossier : pas d'entrée de données
+    const lhNameLen = dv.getUint16(lhOff + 26, true);
+    const lhExtraLen = dv.getUint16(lhOff + 28, true);
+    const dataStart = lhOff + 30 + lhNameLen + lhExtraLen;
+    const compData = buf.subarray(dataStart, dataStart + compSize);
+    let data;
+    if (method === 0) {
+      data = compData;
+    } else if (method === 8) {
+      const stream = new Blob([compData]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      data = new Uint8Array(await new Response(stream).arrayBuffer());
+    } else {
+      throw new Error(`Méthode de compression non supportée (${method}) pour ${name}.`);
+    }
+    files.push({ path: name, data });
+  }
+  return files;
 }
 
 // Transforme une liste {path, file} en un zip prêt à uploader.
