@@ -20,6 +20,7 @@ export const ICONS = {
   edit:     '<svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
   folder:   '<svg class="ic" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>',
   trash:    '<svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>',
+  kebab:    '<svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" style="fill:currentColor;stroke:none"/><circle cx="12" cy="12" r="1.8" style="fill:currentColor;stroke:none"/><circle cx="19" cy="12" r="1.8" style="fill:currentColor;stroke:none"/></svg>',
 };
 
 export const STATUS = {

@@ -48,20 +48,11 @@ function thumbHTML(b) {
   }
   return `<div class="pcard-thumb" style="${thumbStyle(b.app_name)}">${inner}</div>`;
 }
-// Corps dynamique de la carte : titre, sous-titre, actions.
+// Corps dynamique de la carte : titre, sous-titre, déclencheur du menu
+// d'actions groupées (⋯ — voir cardMenuItemsHTML plus bas).
 // (La progression détaillée est affichée dans le dock flottant.)
 function bodyHTML(b) {
   const failed = b.status === "failed";
-  const download = b.status === "success"
-    ? `<a class="icon-btn primary" href="/api/builds/${b.id}/apk" title="Télécharger l'APK" download>${ICONS.download}</a>` : "";
-  const runLink = b.run_url
-    ? `<a class="icon-btn" href="${esc(b.run_url)}" target="_blank" rel="noopener" title="Voir le run">${ICONS.external}</a>` : "";
-  // Le code source (dist.zip) est conservé côté serveur pour tout build "bundle"
-  // (projet importé ou généré par IA), indépendamment du statut du build APK.
-  const sourceLink = b.mode === "bundle"
-    ? `<a class="icon-btn" href="/api/builds/${b.id}/source" title="Télécharger le code source" download>${ICONS.code}</a>
-       <button type="button" class="icon-btn" data-edit-source="${b.id}" title="Éditer le code et relancer un build">${ICONS.edit}</button>` : "";
-  const remove = `<button class="icon-btn" data-remove="${b.id}" title="Retirer de la liste">${ICONS.cross}</button>`;
   const subText = failed && b.error ? b.error
     : (b.mode === "bundle" ? `${b.url} · hors-ligne` : b.url);
   const sub = failed && b.error ? esc(b.error)
@@ -72,7 +63,9 @@ function bodyHTML(b) {
         <p class="pcard-title">${esc(b.app_name)}</p>
         <p class="pcard-sub"${failed ? ' style="color:var(--err)"' : ''} title="${esc(subText)}">${sub}</p>
       </div>
-      <div class="actions">${download}${sourceLink}${runLink}${remove}</div>
+      <div class="actions">
+        <button type="button" class="icon-btn" data-menu-toggle="${b.id}" title="Actions">${ICONS.kebab}</button>
+      </div>
     </div>`;
 }
 function card(b) {
@@ -245,14 +238,69 @@ detailCard.addEventListener("click", (e) => {
   if (delId) { closeDetail(); deleteBuild(delId); }
 });
 
-// Clic sur une carte : ouvre la vue détail, sauf si le clic vient de sa zone
-// d'actions (téléchargement, édition, suppression…) qui garde son propre
-// comportement (navigation native ou handler dédié).
+// ---- menu d'actions groupées d'une carte (⋯) : un seul élément partagé,
+// repositionné en JS à chaque ouverture — évite le clipping par
+// overflow:hidden des cartes (nécessaire à l'arrondi de la vignette). ----
+const cardMenuEl = $("cardMenu");
+let cardMenuBuildId = null;
+
+function cardMenuItemsHTML(b) {
+  const items = [];
+  items.push(`<button type="button" class="card-menu-item" data-menu-open="${b.id}">${ICONS.external}<span>Ouvrir</span></button>`);
+  if (b.status === "success") {
+    items.push(`<a class="card-menu-item" href="/api/builds/${b.id}/apk" download>${ICONS.download}<span>Télécharger l'APK</span></a>`);
+  }
+  if (b.mode === "bundle") {
+    items.push(`<a class="card-menu-item" href="/api/builds/${b.id}/source" download>${ICONS.folder}<span>Télécharger le code</span></a>`);
+    items.push(`<button type="button" class="card-menu-item" data-edit-source="${b.id}">${ICONS.edit}<span>Éditer le code</span></button>`);
+  }
+  if (b.run_url) {
+    items.push(`<a class="card-menu-item" href="${esc(b.run_url)}" target="_blank" rel="noopener">${ICONS.external}<span>Voir le run</span></a>`);
+  }
+  items.push(`<div class="card-menu-sep"></div>`);
+  items.push(`<button type="button" class="card-menu-item danger" data-remove="${b.id}">${ICONS.trash}<span>Supprimer</span></button>`);
+  return items.join("");
+}
+function closeCardMenu() { cardMenuEl.hidden = true; cardMenuBuildId = null; }
+function openCardMenu(b, anchorBtn) {
+  if (cardMenuBuildId === b.id && !cardMenuEl.hidden) { closeCardMenu(); return; }
+  cardMenuEl.innerHTML = cardMenuItemsHTML(b);
+  cardMenuEl.hidden = false;
+  cardMenuBuildId = b.id;
+  const r = anchorBtn.getBoundingClientRect();
+  const menuW = cardMenuEl.offsetWidth || 214;
+  const menuH = cardMenuEl.offsetHeight || 200;
+  let left = r.right - menuW;
+  left = Math.max(8, Math.min(left, window.innerWidth - menuW - 8));
+  let top = r.bottom + 6;
+  if (top + menuH > window.innerHeight - 8) top = r.top - menuH - 6; // pas assez de place en dessous -> ouvre vers le haut
+  cardMenuEl.style.left = `${left}px`;
+  cardMenuEl.style.top = `${top}px`;
+}
+cardMenuEl.addEventListener("click", (e) => {
+  const openId = e.target.closest("[data-menu-open]")?.dataset.menuOpen;
+  if (openId) { closeCardMenu(); const b = builds.find((x) => x.id === openId); if (b) openDetail(b); return; }
+  const editId = e.target.closest("[data-edit-source]")?.dataset.editSource;
+  if (editId) { closeCardMenu(); editAndRebuild(editId); return; }
+  const delId = e.target.closest("[data-remove]")?.dataset.remove;
+  if (delId) { closeCardMenu(); deleteBuild(delId); }
+});
+document.addEventListener("click", (e) => {
+  if (cardMenuEl.hidden) return;
+  if (e.target.closest("[data-menu-toggle]") || cardMenuEl.contains(e.target)) return;
+  closeCardMenu();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !cardMenuEl.hidden) closeCardMenu(); });
+
+// Clic sur une carte : bouton ⋯ -> menu d'actions ; sinon (hors zone
+// d'actions) -> ouvre la vue détail.
 function cardClickHandler(e) {
-  const editId = e.target.closest?.("[data-edit-source]")?.dataset.editSource;
-  if (editId) { editAndRebuild(editId); return; }
-  const delId = e.target.closest?.("[data-remove]")?.dataset.remove;
-  if (delId) { deleteBuild(delId); return; }
+  const toggle = e.target.closest("[data-menu-toggle]");
+  if (toggle) {
+    const b = builds.find((x) => x.id === toggle.dataset.menuToggle);
+    if (b) openCardMenu(b, toggle);
+    return;
+  }
   if (e.target.closest(".actions")) return;
   const cardEl = e.target.closest(".pcard");
   if (!cardEl) return;

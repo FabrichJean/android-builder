@@ -734,6 +734,11 @@
       <div class="modal-card detail-card" id="detailCard"></div>
     </div>
 
+    <!-- menu d'actions groupées d'une carte (bouton ⋯) : un seul élément
+         partagé, positionné en JS (position: fixed) pour échapper au
+         overflow:hidden des cartes (arrondi de la vignette). -->
+    <div class="card-menu" id="cardMenu" hidden></div>
+
     <!-- modal de l'éditeur de code du dist : toujours en thème sombre (indépendant
          du thème clair/sombre du reste de l'app), sans gros boutons — Ctrl/Cmd+S
          enregistre le fichier actif, Échap/× ferme (avec confirmation s'il y a
