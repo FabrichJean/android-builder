@@ -89,6 +89,8 @@ const treeEl = $("editorTree"), tabsEl = $("editorTabs"), cmHost = $("editorCm")
 const statusLangEl = $("editorStatusLang"), statusPosEl = $("editorStatusPos");
 const errorEl = $("editorError");
 const cancelBtn = $("editorCancel");
+const confirmEl = $("editorConfirm");
+const confirmApplyBtn = $("editorConfirmApply"), confirmDiscardBtn = $("editorConfirmDiscard"), confirmStayBtn = $("editorConfirmStay");
 
 let working = null;      // Map path -> { data, textInitial, editable }
 let order = [];          // tous les chemins, triés
@@ -97,7 +99,9 @@ let expandedDirs = null; // Set des chemins de dossiers dépliés
 let openTabs = [];        // chemins actuellement ouverts en onglet
 let activeTab = null;
 let viewsByPath = null;   // Map path -> { view, host }  (instances CodeMirror vivantes)
-let dirtyPaths = null;    // Set des chemins modifiés
+let dirtyPaths = null;    // Set des chemins modifiés depuis leur dernier "Enregistrer" (Ctrl/Cmd+S)
+let changedPaths = null;  // Set des chemins modifiés au moins une fois durant la session (jamais retiré) —
+                          // sert à savoir, à la fermeture, s'il y a quelque chose à proposer d'appliquer.
 let resolveFn = null;
 
 function buildTree(paths) {
@@ -215,7 +219,10 @@ async function mountView(path) {
         displayText: "blocks",
       }),
       cm.EditorView.updateListener.of((u) => {
-        if (u.docChanged && !dirtyPaths.has(path)) { dirtyPaths.add(path); renderTree(); renderTabs(); }
+        if (u.docChanged) {
+          changedPaths.add(path);
+          if (!dirtyPaths.has(path)) { dirtyPaths.add(path); renderTree(); renderTabs(); }
+        }
         if (path === activeTab && (u.docChanged || u.selectionSet)) updateStatusBar(path, u.state);
       }),
     ],
@@ -262,40 +269,82 @@ function closeTab(path) {
 
 function closeModal() {
   modal.classList.remove("open");
+  confirmEl.hidden = true;
   if (viewsByPath) for (const { view } of viewsByPath.values()) view?.destroy();
   cmHost.innerHTML = ""; treeEl.innerHTML = ""; tabsEl.innerHTML = "";
   statusLangEl.textContent = ""; statusPosEl.textContent = "";
   working = null; order = []; tree = null; expandedDirs = null;
-  openTabs = []; activeTab = null; viewsByPath = null; dirtyPaths = null; resolveFn = null;
+  openTabs = []; activeTab = null; viewsByPath = null; dirtyPaths = null; changedPaths = null; resolveFn = null;
   errorEl.textContent = "";
 }
-cancelBtn.addEventListener("click", () => { const r = resolveFn; closeModal(); if (r) r(null); });
-modal.addEventListener("click", (e) => { if (e.target === modal) cancelBtn.click(); });
 
-function doSave() {
+// Ctrl/Cmd+S : "enregistre" seulement le fichier actif (efface son point
+// orange), sans fermer l'éditeur — comme un save par onglet dans VS Code.
+// Le contenu réellement pris en compte reste toujours la dernière version
+// tapée (dirty ou non) : ce marqueur n'est qu'un repère visuel pour
+// l'utilisateur, pas une porte qui bloquerait quoi que ce soit.
+function saveActiveFile() {
+  if (!activeTab || !dirtyPaths.has(activeTab)) return;
+  dirtyPaths.delete(activeTab);
+  renderTree(); renderTabs();
+  const mounted = viewsByPath.get(activeTab);
+  if (mounted?.view) {
+    const prevHint = statusPosEl.textContent;
+    statusPosEl.textContent = "Enregistré ✓";
+    setTimeout(() => { if (mounted.view) updateStatusBar(activeTab, mounted.view.state); }, 900);
+  }
+}
+
+// Construit la liste finale des fichiers à partir de l'état courant de
+// chaque onglet ouvert (ou du texte initial pour ceux jamais ouverts).
+function collectFiles() {
   const enc = new TextEncoder();
-  const files = order.map((path) => {
+  return order.map((path) => {
     const entry = working.get(path);
     if (!entry.editable) return { path, data: entry.data };
     const mounted = viewsByPath.get(path);
     const text = mounted?.view ? mounted.view.state.doc.toString() : entry.textInitial;
     return { path, data: enc.encode(text) };
   });
+}
+
+// Fermeture (icône ×, Échap, clic hors modal) : si rien n'a été modifié
+// durant la session, on ferme directement. Sinon on demande confirmation
+// avant d'appliquer les changements (c'est ce moment-là qui déclenchera le
+// rebuild côté formulaire, pas chaque Ctrl+S individuel).
+function requestClose() {
+  if (!changedPaths || changedPaths.size === 0) { const r = resolveFn; closeModal(); if (r) r(null); return; }
+  confirmEl.hidden = false;
+}
+function hideConfirm() { confirmEl.hidden = true; }
+confirmStayBtn.addEventListener("click", hideConfirm);
+confirmDiscardBtn.addEventListener("click", () => { const r = resolveFn; closeModal(); if (r) r(null); });
+confirmApplyBtn.addEventListener("click", () => {
+  const files = collectFiles();
   const r = resolveFn;
   closeModal();
   if (r) r(files);
-}
-// Pas de gros boutons "Enregistrer"/"Annuler" : Ctrl/Cmd+S sauvegarde,
-// Échap annule (l'icône × du titre fait la même chose que Échap).
+});
+
+cancelBtn.addEventListener("click", requestClose);
+modal.addEventListener("click", (e) => { if (e.target === modal) requestClose(); });
+
+// Pas de gros boutons "Enregistrer"/"Annuler" : Ctrl/Cmd+S enregistre le
+// fichier actif, Échap ferme (avec confirmation si besoin) — l'icône × du
+// titre fait la même chose qu'Échap.
 document.addEventListener("keydown", (e) => {
   if (!modal.classList.contains("open")) return;
-  if (e.key === "Escape") { cancelBtn.click(); return; }
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); doSave(); }
+  if (e.key === "Escape") {
+    if (!confirmEl.hidden) hideConfirm(); else requestClose();
+    return;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveActiveFile(); }
 });
 
 // Ouvre l'éditeur sur une liste [{path, data:Uint8Array}] ; résout avec la
-// liste modifiée (même forme) si l'utilisateur clique "Enregistrer", ou
-// `null` s'il annule.
+// liste modifiée (même forme) si l'utilisateur choisit d'appliquer ses
+// changements à la fermeture, ou `null` s'il ferme sans rien modifier / en
+// ignorant ses modifications.
 export function openEditor(files, title) {
   return new Promise((resolve) => {
     $("editorTitle").textContent = title || "Éditer le code";
@@ -308,7 +357,7 @@ export function openEditor(files, title) {
     }
     tree = buildTree(order);
     expandedDirs = new Set(allDirPaths(tree));
-    openTabs = []; activeTab = null; viewsByPath = new Map(); dirtyPaths = new Set();
+    openTabs = []; activeTab = null; viewsByPath = new Map(); dirtyPaths = new Set(); changedPaths = new Set();
     resolveFn = resolve;
     errorEl.textContent = "";
     modal.classList.add("open");

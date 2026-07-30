@@ -1060,10 +1060,34 @@
   .editor-close .ic { width: 15px; height: 15px; }
   .editor-close:hover { color: var(--ed-text); background: var(--ed-surface); }
   .editor-body {
-    display: flex; height: 68vh; min-height: 380px;
+    position: relative; display: flex; height: 68vh; min-height: 380px;
     border: 1px solid var(--ed-border); border-radius: 10px; overflow: hidden;
     background: var(--ed-surface);
   }
+
+  /* -- confirmation à la fermeture, si des changements n'ont pas été appliqués -- */
+  .editor-confirm {
+    position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;
+    background: rgba(8, 6, 4, 0.78); backdrop-filter: blur(2px);
+  }
+  .editor-confirm[hidden] { display: none; }
+  .editor-confirm-box {
+    width: 100%; max-width: 300px; padding: 16px; border-radius: 12px;
+    background: var(--ed-panel); border: 1px solid var(--ed-border);
+    box-shadow: 0 14px 40px -16px rgba(0,0,0,.7);
+  }
+  .editor-confirm-title { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--ed-text); }
+  .editor-confirm-sub { margin: 0 0 14px; font-size: 11.5px; color: var(--ed-muted); }
+  .editor-confirm-actions { display: flex; flex-direction: column; gap: 6px; }
+  .editor-confirm-btn {
+    font-family: inherit; font-size: 12px; font-weight: 600; padding: 8px 10px;
+    border-radius: 8px; border: 1px solid var(--ed-border); background: none;
+    color: var(--ed-muted); cursor: pointer;
+  }
+  .editor-confirm-btn:hover { color: var(--ed-text); background: var(--ed-surface); }
+  .editor-confirm-btn.ghost { color: var(--ed-err); }
+  .editor-confirm-btn.primary { background: var(--ed-sand); color: #201a0e; border-color: transparent; font-weight: 700; }
+  .editor-confirm-btn.primary:hover { filter: brightness(1.06); background: var(--ed-sand); }
 
   /* -- barre latérale : arborescence repliable -- */
   .editor-sidebar {

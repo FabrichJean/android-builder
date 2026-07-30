@@ -730,13 +730,14 @@
     </div>
 
     <!-- modal de l'éditeur de code du dist : toujours en thème sombre (indépendant
-         du thème clair/sombre du reste de l'app), sans gros boutons — Enregistrer
-         se fait via Ctrl/Cmd+S, Annuler via l'icône × ou Échap. -->
+         du thème clair/sombre du reste de l'app), sans gros boutons — Ctrl/Cmd+S
+         enregistre le fichier actif, Échap/× ferme (avec confirmation s'il y a
+         des changements à appliquer au projet). -->
     <div class="modal" id="editorModal">
       <div class="modal-card editor-card">
         <div class="editor-titlebar">
           <h3 id="editorTitle">Éditer le code</h3>
-          <button type="button" class="editor-close" id="editorCancel" title="Fermer sans enregistrer (Échap)">
+          <button type="button" class="editor-close" id="editorCancel" title="Fermer (Échap)">
             <svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </div>
@@ -751,7 +752,18 @@
             <div class="editor-status">
               <span id="editorStatusLang"></span>
               <span id="editorStatusPos"></span>
-              <span class="editor-status-hint">⌘S enregistrer · Échap fermer</span>
+              <span class="editor-status-hint">⌘S enregistrer le fichier · Échap fermer</span>
+            </div>
+          </div>
+          <div class="editor-confirm" id="editorConfirm" hidden>
+            <div class="editor-confirm-box">
+              <p class="editor-confirm-title">Appliquer les modifications ?</p>
+              <p class="editor-confirm-sub">Le prochain build utilisera cette version du code.</p>
+              <div class="editor-confirm-actions">
+                <button type="button" class="editor-confirm-btn" id="editorConfirmStay">Continuer l'édition</button>
+                <button type="button" class="editor-confirm-btn ghost" id="editorConfirmDiscard">Ignorer les modifs</button>
+                <button type="button" class="editor-confirm-btn primary" id="editorConfirmApply">Appliquer</button>
+              </div>
             </div>
           </div>
         </div>
