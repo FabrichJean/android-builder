@@ -1030,34 +1030,106 @@
   .btn-ghost { background: transparent; border: 1px solid var(--border-2); color: var(--muted); }
   .btn-ghost:hover { color: var(--text); }
 
-  /* ---- modal de l'éditeur de code ---- */
-  .editor-card { max-width: 900px; width: 92vw; display: flex; flex-direction: column; }
+  /* ---- modal de l'éditeur de code (façon VS Code) ----
+     Palette figée (--ed-*), volontairement indépendante des variables de
+     thème --surface/--text/etc. : l'éditeur reste toujours sombre, même
+     quand le reste de l'app est en thème clair. Padding et boutons réduits
+     au minimum — pas de gros bouton "Enregistrer"/"Annuler" (Ctrl/Cmd+S et
+     Échap/icône × à la place). */
+  .editor-card {
+    --ed-bg:      #100d0a;
+    --ed-surface: #17130f;
+    --ed-panel:   #0e0b09;
+    --ed-border:  rgba(224, 201, 141, 0.10);
+    --ed-text:    #e4dbc8;
+    --ed-muted:   #8d8267;
+    --ed-faint:   #5f5744;
+    --ed-sand:    #e0c07d;
+    --ed-sand-soft: rgba(224, 192, 125, 0.12);
+    --ed-err:     #dd8b78;
+    max-width: 1080px; width: 94vw; padding: 12px;
+    display: flex; flex-direction: column;
+    background: var(--ed-bg); border-color: var(--ed-border);
+  }
+  .editor-titlebar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .editor-titlebar h3 { font-size: 13.5px; margin: 0; color: var(--ed-text); }
+  .editor-close {
+    display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px;
+    background: none; border: none; color: var(--ed-muted); cursor: pointer; flex: none;
+  }
+  .editor-close .ic { width: 15px; height: 15px; }
+  .editor-close:hover { color: var(--ed-text); background: var(--ed-surface); }
   .editor-body {
-    display: flex; gap: 12px; height: 60vh; min-height: 340px;
-    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    display: flex; height: 68vh; min-height: 380px;
+    border: 1px solid var(--ed-border); border-radius: 10px; overflow: hidden;
+    background: var(--ed-surface);
   }
-  .editor-files {
-    flex: none; width: 220px; overflow-y: auto; background: var(--well);
-    border-right: 1px solid var(--border); padding: 6px;
+
+  /* -- barre latérale : arborescence repliable -- */
+  .editor-sidebar {
+    flex: none; width: 220px; overflow-y: auto; background: var(--ed-panel);
+    border-right: 1px solid var(--ed-border);
   }
-  .editor-file {
-    display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
-    background: none; border: none; cursor: pointer; color: var(--muted);
-    font-family: inherit; font-size: 12.5px; padding: 7px 8px; border-radius: 8px;
+  .editor-sidebar-head {
+    padding: 8px 10px 4px; font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    color: var(--ed-faint); text-transform: uppercase;
   }
-  .editor-file:hover { background: var(--surface-2); color: var(--text); }
-  .editor-file.active { background: var(--sand-soft); color: var(--sand); }
-  .editor-file-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; word-break: break-all; }
-  .editor-file-dirty { flex: none; color: var(--sand); font-size: 9px; }
-  .editor-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--surface); }
-  .editor-pane-head {
-    flex: none; padding: 8px 12px; font-size: 12px; color: var(--muted);
-    border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .editor-tree { padding: 2px 4px 8px; }
+  .tree-node { display: block; }
+  .tree-row {
+    display: flex; align-items: center; gap: 5px; width: 100%; text-align: left;
+    background: none; border: none; cursor: pointer; color: var(--ed-muted);
+    font-family: inherit; font-size: 12px; padding: 3px 6px 3px calc(6px + var(--depth, 0) * 14px);
+    border-radius: 5px; white-space: nowrap;
   }
-  .editor-cm { flex: 1; min-height: 0; overflow: auto; }
+  .tree-row:hover { background: var(--ed-surface); color: var(--ed-text); }
+  .tree-file.active { background: var(--ed-sand-soft); color: var(--ed-sand); }
+  .tree-chev {
+    flex: none; width: 12px; height: 12px; color: var(--ed-faint);
+    transition: transform .12s;
+  }
+  .tree-dir.open .tree-chev { transform: rotate(90deg); }
+  .tree-folder-ic { flex: none; width: 13px; height: 13px; color: #d9a94f; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .tree-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .dirty-dot {
+    flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--ed-sand);
+  }
+  .file-badge {
+    flex: none; width: 15px; height: 15px; border-radius: 4px; display: grid; place-items: center;
+    font-size: 8px; font-weight: 800; line-height: 1; background: rgba(255,255,255,.05);
+  }
+  .file-badge.small { width: 13px; height: 13px; font-size: 7px; }
+
+  /* -- zone d'édition : onglets + CodeMirror + barre de statut -- */
+  .editor-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--ed-surface); }
+  .editor-tabs {
+    flex: none; display: flex; overflow-x: auto; background: var(--ed-panel);
+    border-bottom: 1px solid var(--ed-border);
+  }
+  .editor-tab {
+    display: flex; align-items: center; gap: 5px; flex: none; cursor: pointer;
+    padding: 6px 6px 6px 10px; font-size: 11.5px; color: var(--ed-muted);
+    border-right: 1px solid var(--ed-border); max-width: 170px;
+  }
+  .editor-tab.active { background: var(--ed-surface); color: var(--ed-text); }
+  .editor-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .editor-tab-close {
+    flex: none; background: none; border: none; color: var(--ed-faint); cursor: pointer;
+    font-size: 13px; line-height: 1; padding: 2px 3px; border-radius: 4px;
+  }
+  .editor-tab-close:hover { color: var(--ed-err); background: var(--ed-panel); }
+  .editor-cm { flex: 1; min-height: 0; position: relative; }
+  .editor-view-host { display: none; height: 100%; }
+  .editor-view-host.shown { display: block; }
   .editor-cm .cm-editor { height: 100%; font-size: 12.5px; }
   .editor-cm .cm-scroller { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .editor-binary { padding: 20px; color: var(--faint); font-size: 13px; }
+  .editor-binary { padding: 16px; color: var(--ed-faint); font-size: 13px; }
+  .editor-status {
+    flex: none; display: flex; align-items: center; gap: 14px; padding: 4px 10px; font-size: 10.5px;
+    color: var(--ed-faint); background: var(--ed-panel); border-top: 1px solid var(--ed-border);
+  }
+  .editor-status-hint { margin-left: auto; }
+  .editor-card .form-error { margin-top: 6px; color: var(--ed-err); }
   .btn-gold { background: var(--gold-grad); box-shadow: var(--gold-shadow); color: #201a0e; }
 
   /* ---- galerie de builds (cartes) ---- */

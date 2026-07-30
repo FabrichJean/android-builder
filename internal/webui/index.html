@@ -729,23 +729,33 @@
       </div>
     </div>
 
-    <!-- modal de l'éditeur de code du dist -->
+    <!-- modal de l'éditeur de code du dist : toujours en thème sombre (indépendant
+         du thème clair/sombre du reste de l'app), sans gros boutons — Enregistrer
+         se fait via Ctrl/Cmd+S, Annuler via l'icône × ou Échap. -->
     <div class="modal" id="editorModal">
       <div class="modal-card editor-card">
-        <h3 id="editorTitle">Éditer le code</h3>
-        <p class="modal-sub">Modifie les fichiers du projet avant de lancer le build.</p>
+        <div class="editor-titlebar">
+          <h3 id="editorTitle">Éditer le code</h3>
+          <button type="button" class="editor-close" id="editorCancel" title="Fermer sans enregistrer (Échap)">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
         <div class="editor-body">
-          <div class="editor-files" id="editorFiles"></div>
+          <div class="editor-sidebar">
+            <div class="editor-sidebar-head">Explorateur</div>
+            <div class="editor-tree" id="editorTree"></div>
+          </div>
           <div class="editor-pane">
-            <div class="editor-pane-head" id="editorFileName"></div>
+            <div class="editor-tabs" id="editorTabs"></div>
             <div class="editor-cm" id="editorCm"></div>
+            <div class="editor-status">
+              <span id="editorStatusLang"></span>
+              <span id="editorStatusPos"></span>
+              <span class="editor-status-hint">⌘S enregistrer · Échap fermer</span>
+            </div>
           </div>
         </div>
         <div class="form-error" id="editorError"></div>
-        <div class="modal-actions">
-          <button type="button" class="btn-ghost" id="editorCancel">Annuler</button>
-          <button type="button" class="btn-gold" id="editorSave">Enregistrer</button>
-        </div>
       </div>
     </div>
 
