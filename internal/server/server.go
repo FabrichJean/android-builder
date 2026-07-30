@@ -45,6 +45,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("POST /api/builds", s.handleCreateBuild)
 	mux.HandleFunc("GET /api/builds/{id}", s.handleGetBuild)
+	mux.HandleFunc("DELETE /api/builds/{id}", s.handleDeleteBuild)
 	mux.HandleFunc("GET /api/builds/{id}/events", s.handleEvents)
 	mux.HandleFunc("GET /api/builds/{id}/apk", s.handleDownloadAPK)
 	mux.HandleFunc("GET /api/builds/{id}/source", s.handleDownloadSource)

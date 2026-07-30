@@ -18,12 +18,29 @@ func (s *Server) handleGetBuild(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, b)
 }
 
+// handleDeleteBuild masque définitivement un build (suppression douce) :
+// la ligne et les fichiers (apk, source, miniature) restent sur le serveur,
+// mais le build disparaît de l'historique et de tous les endpoints publics.
+func (s *Server) handleDeleteBuild(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	b, ok := s.store.Get(id)
+	if !ok || !s.buildVisible(r, b) {
+		writeErr(w, http.StatusNotFound, "build introuvable")
+		return
+	}
+	s.store.SoftDelete(id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // buildVisible détermine si l'appelant peut accéder à un build donné : un
 // build anonyme (créé sans compte) reste accessible à qui connaît son ID
 // (c'est son seul mécanisme d'accès côté client), mais un build rattaché à
 // un compte ne doit être visible qu'à ce même compte — pas aux visiteurs
 // anonymes, ni aux autres comptes.
 func (s *Server) buildVisible(r *http.Request, b *buildstore.Build) bool {
+	if b.Deleted {
+		return false
+	}
 	return b.UserID == "" || b.UserID == s.currentUserID(r)
 }
 

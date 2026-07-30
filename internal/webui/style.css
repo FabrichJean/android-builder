@@ -1180,6 +1180,7 @@
   }
   :root[data-theme="light"] .pcard { background: #fff; }
   .pcard:hover { border-color: var(--border-2); transform: translateY(-2px); }
+  .pcard { cursor: pointer; }
   .pcard-thumb { position: relative; height: 120px; display: grid; place-items: center; }
   .pcard-initial {
     font-size: 42px; font-weight: 800; color: rgba(255,255,255,0.92);
@@ -1209,6 +1210,69 @@
   .pcard-offline { display: inline-flex; align-items: center; gap: 4px; }
   .pcard-offline .ic { width: .95em; height: .95em; }
   .pcard .progress-wrap { padding: 0 14px 14px; margin-top: 0; }
+
+  /* ---- modal de détail d'un build ---- */
+  .detail-card { max-width: 420px; padding: 0; overflow: visible; }
+  .detail-topchip {
+    position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+    font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--sand); background: var(--surface-2); border: 1px solid var(--border-2);
+    padding: 5px 14px; border-radius: 999px; white-space: nowrap;
+  }
+  .detail-body { border-radius: 16px; overflow: hidden; }
+  .detail-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 14px 0;
+  }
+  .detail-close {
+    display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+    background: none; border: none; color: var(--muted); cursor: pointer;
+  }
+  .detail-close:hover { color: var(--text); background: var(--well); }
+  .detail-preview {
+    position: relative; margin: 12px 14px 0; height: 190px; border-radius: 12px;
+    overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 16px; gap: 6px;
+  }
+  .detail-preview-shot {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;
+  }
+  .detail-preview::after {
+    content: ""; position: absolute; inset: 0; z-index: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.55));
+  }
+  .detail-preview > * { position: relative; z-index: 1; }
+  .detail-preview-name { font-size: 22px; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.5); }
+  .detail-preview-sub { font-size: 12.5px; color: rgba(255,255,255,.82); }
+  .detail-play {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 6px;
+    background: var(--ok); color: #16321f; font-weight: 700; font-size: 13px;
+    padding: 9px 18px; border-radius: 999px; text-decoration: none; border: none; cursor: pointer;
+  }
+  .detail-play:hover { filter: brightness(1.05); }
+  .detail-play .ic { width: 14px; height: 14px; }
+  .detail-foot { padding: 14px; }
+  .detail-foot-name { font-size: 17px; font-weight: 750; margin: 0 0 2px; }
+  .detail-foot-src {
+    display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--faint); margin-bottom: 14px;
+  }
+  .detail-foot-src .ic { width: 13px; height: 13px; }
+  .detail-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 8px; }
+  .detail-action {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 10px 4px; border-radius: 11px; border: 1px solid var(--border-2);
+    background: none; color: var(--muted); cursor: pointer; font-family: inherit;
+    text-decoration: none;
+  }
+  .detail-action:hover { color: var(--text); border-color: var(--sand-dim); }
+  .detail-action .ic { width: 16px; height: 16px; }
+  .detail-action-label { font-size: 9.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; text-align: center; }
+  .detail-action.primary {
+    background: var(--gold-grad); color: #201a0e; border-color: transparent; box-shadow: var(--gold-shadow);
+  }
+  .detail-action.danger { color: var(--err); border-color: rgba(221,139,120,.3); }
+  .detail-action.danger:hover { background: rgba(221,139,120,.1); border-color: var(--err); }
+  .detail-action[disabled] { opacity: .35; pointer-events: none; }
 
   /* ---- dock flottant des builds en cours ---- */
   .active-dock {

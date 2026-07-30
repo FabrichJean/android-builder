@@ -29,9 +29,9 @@ function matchFilter(b) {
   if (activeFilter === "failed") return b.status === "failed";
   return true;
 }
-function pillHTML(b) {
+function pillHTML(b, extraClass = "pcard-pill") {
   const st = STATUS[b.status] || STATUS.pending;
-  return `<span class="pill ${st.cls} pcard-pill"><span class="dot"></span>${st.label}</span>`;
+  return `<span class="pill ${st.cls} ${extraClass}"><span class="dot"></span>${st.label}</span>`;
 }
 // Vignette : stable (jamais recréée sur une simple mise à jour de progression).
 function thumbHTML(b) {
@@ -136,12 +136,130 @@ async function editAndRebuild(id) {
   }
 }
 
-recentEl.addEventListener("click", (e) => {
+// Supprime réellement le build côté serveur (soft delete : la ligne et les
+// fichiers restent en base/disque, mais le build disparaît de partout) avant
+// de le retirer de la liste locale — best-effort si le réseau échoue, pour
+// ne pas bloquer l'utilisateur sur une action de nettoyage.
+async function deleteBuild(id) {
+  try { await fetch(`/api/builds/${id}`, { method: "DELETE" }); } catch { /* best-effort */ }
+  removeBuildById(id); saveLocal(); render();
+}
+
+// Pré-remplit le formulaire avec les infos (nom, package, splash) de ce
+// build, sans toucher au dist/code — l'utilisateur relance lui-même un
+// nouveau build avec les infos modifiées (même logique que "Éditer le code",
+// mais côté métadonnées plutôt que fichiers).
+function modifyInfo(id) {
+  const b = builds.find((x) => x.id === id);
+  if (!b) return;
+  switchView("home");
+  if (b.app_name) $("name").value = b.app_name;
+  if (b.package) $("pkg").value = b.package;
+  if (b.splash) {
+    const hexInput = $("splashHex");
+    hexInput.value = b.splash;
+    hexInput.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  updatePreview();
+  $("form").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ---- vue détail : grand panneau (aperçu, statut, actions) ouvert au clic
+// sur une carte (hors zone d'actions, qui garde son comportement propre). ----
+const detailModal = $("detailModal"), detailCard = $("detailCard");
+
+function detailTopChipLabel(b) { return b.mode === "bundle" ? "Projet hors ligne" : "Projet en ligne"; }
+function detailPreviewHTML(b) {
+  const shot = b.thumbReady
+    ? `<img class="detail-preview-shot" src="/api/builds/${b.id}/thumb" alt="" onerror="this.remove()" />` : "";
+  const subText = b.mode === "bundle" ? "Projet importé · hors-ligne" : esc(b.url || "");
+  const playBtn = b.mode !== "bundle" && b.url
+    ? `<a class="detail-play" href="${esc(b.url)}" target="_blank" rel="noopener">${ICONS.external}Ouvrir le site</a>`
+    : b.status === "success"
+      ? `<a class="detail-play" href="/api/builds/${b.id}/apk" download>${ICONS.download}Télécharger l'APK</a>`
+      : "";
+  return `<div class="detail-preview" style="${thumbStyle(b.app_name)}">
+    ${shot}
+    <span class="detail-preview-name">${esc(b.app_name)}</span>
+    <span class="detail-preview-sub">${subText}</span>
+    ${playBtn}
+  </div>`;
+}
+function detailActionsHTML(b) {
+  const canDownload = b.status === "success";
+  const download = `<a class="detail-action${canDownload ? " primary" : ""}"
+    ${canDownload ? `href="/api/builds/${b.id}/apk" download` : "disabled"} title="Télécharger l'APK">
+    ${ICONS.download}<span class="detail-action-label">Télécharger</span></a>`;
+  const editCode = b.mode === "bundle"
+    ? `<button type="button" class="detail-action" data-detail-edit="${b.id}" title="Éditer le code">
+        ${ICONS.code}<span class="detail-action-label">Éditer code</span></button>` : "";
+  const editInfo = `<button type="button" class="detail-action" data-detail-info="${b.id}" title="Modifier les infos">
+    ${ICONS.edit}<span class="detail-action-label">Modifier infos</span></button>`;
+  const openRun = b.run_url
+    ? `<a class="detail-action" href="${esc(b.run_url)}" target="_blank" rel="noopener" title="Voir le run">
+        ${ICONS.external}<span class="detail-action-label">Ouvrir</span></a>` : "";
+  const del = `<button type="button" class="detail-action danger" data-detail-delete="${b.id}" title="Supprimer">
+    ${ICONS.trash}<span class="detail-action-label">Supprimer</span></button>`;
+  return [download, editCode, editInfo, openRun, del].filter(Boolean).join("");
+}
+function detailFootHTML(b) {
+  const srcIcon = b.mode === "bundle" ? ICONS.folder : ICONS.external;
+  const srcLabel = b.mode === "bundle" ? (b.url || "dist.zip") : (b.url || "");
+  return `<div class="detail-foot">
+    <p class="detail-foot-name">${esc(b.app_name)}</p>
+    <div class="detail-foot-src">${srcIcon}<span>${esc(srcLabel)}</span></div>
+    <div class="detail-actions">${detailActionsHTML(b)}</div>
+  </div>`;
+}
+function renderDetailHTML(b) {
+  return `
+    <span class="detail-topchip">${esc(detailTopChipLabel(b))}</span>
+    <div class="detail-body">
+      <div class="detail-header">
+        ${pillHTML(b, "")}
+        <button type="button" class="detail-close" id="detailClose" title="Fermer">${ICONS.cross}</button>
+      </div>
+      ${detailPreviewHTML(b)}
+      ${detailFootHTML(b)}
+    </div>`;
+}
+function openDetail(b) {
+  detailCard.innerHTML = renderDetailHTML(b);
+  detailModal.classList.add("open");
+}
+function closeDetail() {
+  detailModal.classList.remove("open");
+  detailCard.innerHTML = "";
+}
+detailModal.addEventListener("click", (e) => { if (e.target === detailModal) closeDetail(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && detailModal.classList.contains("open")) closeDetail();
+});
+detailCard.addEventListener("click", (e) => {
+  if (e.target.closest("#detailClose")) { closeDetail(); return; }
+  const editId = e.target.closest("[data-detail-edit]")?.dataset.detailEdit;
+  if (editId) { closeDetail(); editAndRebuild(editId); return; }
+  const infoId = e.target.closest("[data-detail-info]")?.dataset.detailInfo;
+  if (infoId) { closeDetail(); modifyInfo(infoId); return; }
+  const delId = e.target.closest("[data-detail-delete]")?.dataset.detailDelete;
+  if (delId) { closeDetail(); deleteBuild(delId); }
+});
+
+// Clic sur une carte : ouvre la vue détail, sauf si le clic vient de sa zone
+// d'actions (téléchargement, édition, suppression…) qui garde son propre
+// comportement (navigation native ou handler dédié).
+function cardClickHandler(e) {
   const editId = e.target.closest?.("[data-edit-source]")?.dataset.editSource;
   if (editId) { editAndRebuild(editId); return; }
-  const id = e.target.getAttribute?.("data-remove");
-  if (id) { removeBuildById(id); saveLocal(); render(); }
-});
+  const delId = e.target.closest?.("[data-remove]")?.dataset.remove;
+  if (delId) { deleteBuild(delId); return; }
+  if (e.target.closest(".actions")) return;
+  const cardEl = e.target.closest(".pcard");
+  if (!cardEl) return;
+  const b = builds.find((x) => x.id === cardEl.dataset.card);
+  if (b) openDetail(b);
+}
+recentEl.addEventListener("click", cardClickHandler);
 $("recentViewAll").addEventListener("click", () => switchView("history"));
 
 // ---- dock flottant des builds en cours ----
@@ -202,12 +320,7 @@ export function render() {
   renderActive();
 }
 
-buildsEl.addEventListener("click", (e) => {
-  const editId = e.target.closest?.("[data-edit-source]")?.dataset.editSource;
-  if (editId) { editAndRebuild(editId); return; }
-  const id = e.target.getAttribute?.("data-remove");
-  if (id) { removeBuildById(id); saveLocal(); render(); }
-});
+buildsEl.addEventListener("click", cardClickHandler);
 
 // Onglets de filtre + recherche.
 $("tabs").addEventListener("click", (e) => {
