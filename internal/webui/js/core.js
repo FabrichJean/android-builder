@@ -17,6 +17,7 @@ export const ICONS = {
   external: '<svg class="ic" viewBox="0 0 24 24"><path d="M14 5h5v5"/><path d="M19 5 10 14"/><path d="M8 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"/></svg>',
   offline:  '<svg class="ic" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="13" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>',
   code:     '<svg class="ic" viewBox="0 0 24 24"><path d="M9 18 3 12l6-6"/><path d="M15 6l6 6-6 6"/></svg>',
+  edit:     '<svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
 };
 
 export const STATUS = {

@@ -3,7 +3,8 @@
 import { $, builds, saveLocal, removeBuildById } from "./core.js";
 import { render, patch } from "./builds-view.js";
 import { subscribe, pollThumbs } from "./realtime.js";
-import { mb, processDistFiles, extractDistIcon } from "./zip.js";
+import { mb, processDistFiles, extractDistIcon, readZip, makeZip } from "./zip.js";
+import { openEditor } from "./editor.js";
 // Dépendance circulaire assumée avec gen.js (qui importe getMode/clearDist/
 // setDist/updatePreview/fail d'ici) : chaque module n'utilise les exports de
 // l'autre qu'à l'intérieur de gestionnaires d'événements, jamais à
@@ -422,19 +423,45 @@ function enterBundleMode(label) {
 $("projectClear").addEventListener("click", () => clearDist());
 
 // ---- dist : dossier ou .zip ----
-let distBlob = null, distName = "", distIconPreview = null;
-export function setDist(blob, name) { distBlob = blob; distName = name; enterBundleMode(name); }
-export function clearDist() { distBlob = null; distName = ""; distIconPreview = null; enterURLMode(); }
+// `distFiles` (liste {path, data}) n'est connu directement qu'après un import
+// dossier ou une édition de code : pour un .zip brut, il est reconstitué à la
+// demande (readZip) au premier clic sur "Éditer le code".
+let distBlob = null, distName = "", distIconPreview = null, distFiles = null, distFolder = null;
+export function setDist(blob, name) { distBlob = blob; distName = name; distFiles = null; distFolder = null; enterBundleMode(name); }
+export function setDistWithFiles(blob, name, files, folder = null) {
+  distBlob = blob; distName = name; distFiles = files; distFolder = folder; enterBundleMode(name);
+}
+export function clearDist() {
+  distBlob = null; distName = ""; distIconPreview = null; distFiles = null; distFolder = null; enterURLMode();
+}
 
 async function ingest(list) {
   if (!list.length) return;
   formError.textContent = ""; enterBundleMode("Préparation…");
   try {
     const { blob, folder, count, files } = await processDistFiles(list);
-    setDist(blob, `${folder}/ · ${count} fichiers (${mb(blob.size)})`);
+    setDistWithFiles(blob, `${folder}/ · ${count} fichiers (${mb(blob.size)})`, files, folder);
     distIconPreview = await extractDistIcon(files); // aperçu depuis l'icône du projet
   } catch (err) { clearDist(); fail(err.message); }
 }
+
+// ---- éditeur de code : modifie les fichiers du dist avant le build ----
+$("projectEdit").addEventListener("click", async () => {
+  if (!distBlob) return;
+  formError.textContent = "";
+  if (!distFiles) {
+    try { distFiles = await readZip(distBlob); }
+    catch (err) { fail("Impossible de lire le projet : " + err.message); return; }
+  }
+  const updated = await openEditor(distFiles, `Éditer ${distFolder ? distFolder + "/" : "le projet"}`);
+  if (!updated) return;
+  try {
+    const blob = makeZip(updated);
+    const label = `${distFolder ? distFolder + "/" : "Projet"} · ${updated.length} fichiers (${mb(blob.size)})`;
+    setDistWithFiles(blob, label, updated, distFolder);
+    distIconPreview = await extractDistIcon(updated).catch(() => distIconPreview);
+  } catch (err) { fail("Échec de la reconstruction du zip : " + err.message); }
+});
 
 // Parcours récursif d'une entrée déposée (drag-drop de dossier).
 function readDirEntries(reader) {

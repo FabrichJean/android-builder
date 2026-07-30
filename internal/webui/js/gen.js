@@ -5,8 +5,9 @@ import { $, esc } from "./core.js";
 // Dépendance circulaire assumée avec create-form.js (voir sa note en tête de
 // fichier) : sûre car aucun de ces exports n'est utilisé à l'évaluation du
 // module, seulement à l'intérieur de gestionnaires d'événements.
-import { getMode, clearDist, setDist, updatePreview, fail } from "./create-form.js";
+import { getMode, clearDist, setDistWithFiles, updatePreview, fail } from "./create-form.js";
 import { refreshAccountCredits } from "./account.js";
+import { readZip } from "./zip.js";
 
 const genPanel = $("genPanel"), genToggle = $("genToggle");
 let genMode = false, genBusy = false, genSession = null, genES = null;
@@ -157,23 +158,37 @@ function genSubscribe(id) {
   };
 }
 
-// Récupère le dist généré, l'installe comme projet importé et enchaîne le build.
+// Récupère le dist généré et l'installe comme projet importé, prêt à être
+// édité (bouton "Éditer le code" du résumé) ou buildé tel quel — l'utilisateur
+// valide lui-même l'envoi via le bouton du formulaire (pas d'auto-submit, pour
+// laisser la fenêtre de relecture/édition avant de consommer un build).
 async function genFinish(s) {
   try {
     const res = await fetch(`/api/generate/${s.id}/dist.zip`);
     if (!res.ok) throw new Error("archive générée indisponible");
     const blob = await res.blob();
+    const files = await readZip(blob);
     if (!$("name").value.trim() && s.app_name) {
       $("name").value = s.app_name;
       updatePreview();
     }
     setGenMode(false);
-    setDist(blob, `App générée par IA · ${s.tokens_used} tokens`);
-    $("form").requestSubmit(); // lance le build APK avec le pipeline bundle existant
+    setDistWithFiles(blob, `App générée par IA · ${s.tokens_used} tokens`, files);
+    renderGenDone(s);
   } catch (err) {
     genReset();
     fail(err.message);
   }
+}
+
+function renderGenDone(s) {
+  genPanel.hidden = false;
+  genPanel.innerHTML = `
+    <div class="gen-note">App générée (${s.tokens_used} tokens) — relis le code, édite-le si besoin (bouton ✎ du résumé ci-dessus), puis lance le build.</div>
+    <div class="gen-actions">
+      <button type="button" class="btn-ghost" id="genDoneClose">Fermer</button>
+    </div>`;
+  $("genDoneClose").addEventListener("click", genReset);
 }
 
 function renderGenOverBudget(s) {

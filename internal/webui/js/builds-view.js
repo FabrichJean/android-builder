@@ -2,6 +2,9 @@
 // aperçu "Builds récents" sur l'accueil, et dock flottant des builds en cours.
 import { $, esc, ICONS, builds, STATUS, saveLocal, removeBuildById, getRecentCount } from "./core.js";
 import { switchView } from "./router.js";
+import { setDistWithFiles, updatePreview, fail } from "./create-form.js";
+import { openEditor } from "./editor.js";
+import { readZip, makeZip, mb } from "./zip.js";
 
 const buildsEl = $("builds");
 const recentEl = $("recentBuilds");
@@ -56,7 +59,8 @@ function bodyHTML(b) {
   // Le code source (dist.zip) est conservé côté serveur pour tout build "bundle"
   // (projet importé ou généré par IA), indépendamment du statut du build APK.
   const sourceLink = b.mode === "bundle"
-    ? `<a class="icon-btn" href="/api/builds/${b.id}/source" title="Télécharger le code source" download>${ICONS.code}</a>` : "";
+    ? `<a class="icon-btn" href="/api/builds/${b.id}/source" title="Télécharger le code source" download>${ICONS.code}</a>
+       <button type="button" class="icon-btn" data-edit-source="${b.id}" title="Éditer le code et relancer un build">${ICONS.edit}</button>` : "";
   const remove = `<button class="icon-btn" data-remove="${b.id}" title="Retirer de la liste">${ICONS.cross}</button>`;
   const subText = failed && b.error ? b.error
     : (b.mode === "bundle" ? `${b.url} · hors-ligne` : b.url);
@@ -106,7 +110,35 @@ function patchRecent(b) {
   const p = el.querySelector(".pcard-pill"); if (p) p.outerHTML = pillHTML(b);
   const body = el.querySelector(".pcard-body"); if (body) body.innerHTML = bodyHTML(b);
 }
+// Recharge le code source (dist.zip) d'un build "bundle" existant dans
+// l'éditeur, puis installe le résultat modifié comme source du formulaire
+// (l'utilisateur relance lui-même le build via le bouton du formulaire —
+// il peut aussi juste consulter le code sans rien changer).
+async function editAndRebuild(id) {
+  const b = builds.find((x) => x.id === id);
+  switchView("home");
+  fail("");
+  try {
+    const res = await fetch(`/api/builds/${id}/source`);
+    if (!res.ok) throw new Error("code source indisponible");
+    const blob = await res.blob();
+    const files = await readZip(blob);
+    const updated = await openEditor(files, `Éditer ${b?.app_name || "le projet"}`);
+    if (!updated) return;
+    const zip = makeZip(updated);
+    if (b?.app_name) $("name").value = b.app_name;
+    if (b?.package) $("pkg").value = b.package;
+    updatePreview();
+    setDistWithFiles(zip, `${b?.app_name || "Projet"} (modifié) · ${updated.length} fichiers (${mb(zip.size)})`, updated);
+    $("form").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    fail(err.message || "Impossible de charger le code source.");
+  }
+}
+
 recentEl.addEventListener("click", (e) => {
+  const editId = e.target.closest?.("[data-edit-source]")?.dataset.editSource;
+  if (editId) { editAndRebuild(editId); return; }
   const id = e.target.getAttribute?.("data-remove");
   if (id) { removeBuildById(id); saveLocal(); render(); }
 });
@@ -171,6 +203,8 @@ export function render() {
 }
 
 buildsEl.addEventListener("click", (e) => {
+  const editId = e.target.closest?.("[data-edit-source]")?.dataset.editSource;
+  if (editId) { editAndRebuild(editId); return; }
   const id = e.target.getAttribute?.("data-remove");
   if (id) { removeBuildById(id); saveLocal(); render(); }
 });
