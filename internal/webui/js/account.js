@@ -5,6 +5,7 @@ import { render, renderRecent } from "./builds-view.js";
 import { subscribe, pollThumbs } from "./realtime.js";
 import { switchView, viewForPath } from "./router.js";
 import { setGenMode, setGenNeedsLogin } from "./gen.js";
+import { enableAdmin } from "./admin.js";
 
 async function loadServerHistory() {
   try {
@@ -82,6 +83,7 @@ export async function initAccount() {
     $("accountName").textContent = data.user.name || data.user.email || "Compte";
     setAvatar(data.user);
     setLoggedInMode(!!data.gen, !!data.gen_banned);
+    if (data.is_admin) enableAdmin();
     renderCredits(data.gen_tokens_remaining, data.gen_daily_token_budget, data.gen_credits_per_day);
     await loadServerHistory();
   } catch {
