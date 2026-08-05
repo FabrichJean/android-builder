@@ -86,7 +86,7 @@ func Load() (*Config, error) {
 		GoogleClientSecret: os.Getenv("GOOGLE_LOGIN_CLIENT_SECRET"),
 		SessionSecret:      os.Getenv("SESSION_SECRET"),
 		ClaudeBin:          env("CLAUDE_BIN", "claude"),
-		GenTokenLimit:      envInt("GEN_TOKEN_LIMIT", 5000),
+		GenTokenLimit:      envInt("GEN_TOKEN_LIMIT", 10000),
 	}
 	if c.SessionSecret == "" {
 		// Pas fourni : on en génère un pour cette exécution (les sessions ne

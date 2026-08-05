@@ -59,7 +59,7 @@ type Session struct {
 	TokenLimit      int        `json:"token_limit"`
 	TokensUsed      int        `json:"tokens_used"`
 	// CreditsRemaining est le budget de tokens de génération encore
-	// disponible aujourd'hui pour ce compte (5 crédits/jour = 5000 tokens,
+	// disponible aujourd'hui pour ce compte (5 crédits/jour = 10000 tokens,
 	// remis à zéro chaque jour). TokenLimit tient déjà compte de ce budget
 	// (min entre le plafond par génération et ce qu'il reste aujourd'hui).
 	CreditsRemaining int    `json:"credits_remaining"`
@@ -153,7 +153,7 @@ func (m *Manager) Prepare(ctx context.Context, userID, desc string) (*Session, e
 			Error:  fmt.Sprintf("compte banni de la génération d'app par IA (limite de %d demandes refusées atteinte).", maxRejections),
 		}, nil
 	}
-	// Crédits journaliers (5/jour = 5000 tokens, remis à zéro chaque jour) :
+	// Crédits journaliers (5/jour = 10000 tokens, remis à zéro chaque jour) :
 	// on bloque avant même d'appeler le CLI si le budget du jour est épuisé.
 	remaining := m.remainingTokens(userID)
 	if remaining <= 0 {

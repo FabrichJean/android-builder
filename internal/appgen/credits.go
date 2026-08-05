@@ -5,14 +5,14 @@ import (
 	"time"
 )
 
-// Crédits journaliers de génération IA : 5 crédits/jour, 1 crédit = 1000
-// tokens de sortie (soit 5000 tokens/jour), par compte. La remise à zéro ne
+// Crédits journaliers de génération IA : 5 crédits/jour, 1 crédit = 2000
+// tokens de sortie (soit 10000 tokens/jour), par compte. La remise à zéro ne
 // demande aucune tâche planifiée : la clé de la table inclut la date du
 // jour, donc un nouveau jour repart simplement sur une ligne à zéro.
 const (
 	creditsPerDay    = 5
-	tokensPerCredit  = 1000
-	dailyTokenBudget = creditsPerDay * tokensPerCredit // 5000
+	tokensPerCredit  = 2000
+	dailyTokenBudget = creditsPerDay * tokensPerCredit // 10000
 )
 
 const creditsSchema = `
@@ -84,5 +84,5 @@ func (m *Manager) RemainingTokens(userID string) int { return m.remainingTokens(
 // DailyTokenBudget renvoie le budget quotidien total de tokens de génération.
 func (m *Manager) DailyTokenBudget() int { return dailyTokenBudget }
 
-// CreditsPerDay renvoie le nombre de crédits quotidiens (1 crédit = 1000 tokens).
+// CreditsPerDay renvoie le nombre de crédits quotidiens (1 crédit = 2000 tokens).
 func (m *Manager) CreditsPerDay() int { return creditsPerDay }
