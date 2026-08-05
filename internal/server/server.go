@@ -12,6 +12,7 @@ import (
 	"github.com/example/android-builder/internal/config"
 	"github.com/example/android-builder/internal/ghclient"
 	"github.com/example/android-builder/internal/thumb"
+	"github.com/example/android-builder/internal/userstore"
 	"github.com/example/android-builder/internal/webui"
 )
 
@@ -22,6 +23,7 @@ type Server struct {
 	store  *buildstore.Store
 	auth   *auth.Manager
 	gen    *appgen.Manager
+	users  *userstore.Store // comptes Google vus à la connexion (espace admin)
 	log    *slog.Logger
 	chrome string        // binaire Chrome pour les miniatures ("" si absent)
 	sem    chan struct{} // limite les captures Chrome concurrentes
@@ -32,8 +34,13 @@ func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, authM
 	if chrome == "" {
 		log.Warn("Chrome introuvable — miniatures désactivées (installe Chrome ou définis CHROME_PATH)")
 	}
+	users, err := userstore.New(store.DB())
+	if err != nil {
+		log.Warn("table des comptes indisponible — l'espace admin listera des comptes sans email", "err", err)
+		users, _ = userstore.New(nil)
+	}
 	return &Server{
-		cfg: cfg, gh: gh, store: store, auth: authMgr, gen: genMgr, log: log,
+		cfg: cfg, gh: gh, store: store, auth: authMgr, gen: genMgr, users: users, log: log,
 		chrome: chrome,
 		sem:    make(chan struct{}, 2),
 	}
@@ -57,6 +64,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/generate/{id}/answers", s.handleGenAnswers)
 	mux.HandleFunc("GET /api/generate/{id}/events", s.handleGenEvents)
 	mux.HandleFunc("GET /api/generate/{id}/dist.zip", s.handleGenZip)
+	// Espace admin (emails listés dans ADMIN_EMAILS) : budgets de tokens par
+	// utilisateur et réinitialisation des crédits du jour.
+	mux.HandleFunc("GET /api/admin/users", s.handleAdminUsers)
+	mux.HandleFunc("PUT /api/admin/users/{id}/budget", s.handleAdminSetBudget)
+	mux.HandleFunc("POST /api/admin/users/{id}/reset-credits", s.handleAdminResetUser)
+	mux.HandleFunc("POST /api/admin/reset-credits", s.handleAdminResetAll)
 	mux.HandleFunc("GET /auth/google/login", s.handleGoogleLogin)
 	mux.HandleFunc("GET /auth/google/callback", s.handleGoogleCallback)
 	mux.HandleFunc("POST /auth/logout", s.handleLogout)
@@ -65,6 +78,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /{$}", s.handleLanding)
 	mux.HandleFunc("GET /app", s.handleIndexPage)
 	mux.HandleFunc("GET /historique", s.handleIndexPage)
+	mux.HandleFunc("GET /admin", s.handleIndexPage)
 	// Assets statiques (style.css, app.js, landing.css…) sur les autres routes.
 	mux.Handle("GET /", http.FileServerFS(webui.FS()))
 	return mux

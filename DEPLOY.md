@@ -251,3 +251,6 @@ Autres points d'attention :
   supprime pas encore les fichiers sur disque.
 - `GEN_TOKEN_LIMIT` (défaut 10000) borne le coût de la génération IA par session
   — à ajuster selon ton budget si la fonctionnalité est activée.
+- `ADMIN_EMAILS` (liste d'emails Google séparés par des virgules) ouvre
+  l'espace admin `/admin` : budget de tokens journalier par utilisateur et
+  remise à zéro des crédits IA (un compte ou tous). Vide = pas d'admin.

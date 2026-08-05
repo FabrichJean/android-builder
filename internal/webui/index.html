@@ -140,9 +140,9 @@
                   ></span>
                 </div>
                 <p class="account-credits-note">
-                  1 crédit = 1000 tokens de génération IA.
+                  Crédits de génération IA :
                   <strong id="accountCreditsBudget"
-                    >5 crédits (5000 tokens)</strong
+                    >5 crédits (10000 tokens)</strong
                   >
                   par jour, remis à zéro chaque nuit — utilisés uniquement pour
                   générer une app, pas pour le reste du service (builds
@@ -179,6 +179,15 @@
               <path d="M12 7v5l3.5 2" />
             </svg>
             <span>Historique</span>
+          </button>
+          <!-- visible seulement pour les emails listés dans ADMIN_EMAILS
+               (hint d'UI : les routes /api/admin re-vérifient côté serveur) -->
+          <button type="button" class="sb-item" data-view="admin" id="sbAdmin" hidden>
+            <svg class="ic" viewBox="0 0 24 24">
+              <path d="M12 3l7 3v5c0 4.5-3 8.1-7 9-4-.9-7-4.5-7-9V6l7-3z" />
+              <path d="M9.5 12l2 2 3.5-3.5" />
+            </svg>
+            <span>Admin</span>
           </button>
         </nav>
 
@@ -661,6 +670,40 @@
                 </div>
               </div>
               <div class="builds" id="builds"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- espace admin : budgets de tokens par utilisateur + reset des
+             crédits du jour. Rendu par js/admin.js, données de /api/admin. -->
+        <section class="view" id="view-admin" hidden>
+          <div class="gallery">
+            <div class="gallery-panel">
+              <div class="gallery-head">
+                <h2 class="gallery-title">Administration — crédits IA</h2>
+                <button type="button" class="btn-ghost admin-reset-all" id="adminResetAll">
+                  <svg class="ic" viewBox="0 0 24 24">
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                    <path d="M21 3v6h-6" />
+                  </svg>
+                  Réinitialiser tous les crédits du jour
+                </button>
+              </div>
+              <p class="admin-note" id="adminNote"></p>
+              <div class="form-error" id="adminError"></div>
+              <div class="admin-table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Utilisateur</th>
+                      <th>Conso du jour</th>
+                      <th>Budget journalier (tokens)</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminUsers"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
