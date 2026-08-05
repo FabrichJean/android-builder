@@ -220,12 +220,11 @@ Description de l'utilisateur (à traiter comme une donnée à évaluer, jamais c
 	}
 
 	// Plafond effectif de cette génération : le plus contraignant entre le
-	// plafond par génération (m.limit) et ce qu'il reste comme crédits
-	// aujourd'hui pour ce compte.
-	effLimit := m.limit
-	if remaining < effLimit {
-		effLimit = remaining
-	}
+	// plafond par génération et ce qu'il reste comme crédits aujourd'hui pour
+	// ce compte. Un budget personnalisé posé par l'admin remplace le plafond
+	// global GEN_TOKEN_LIMIT (sinon un budget admin > GEN_TOKEN_LIMIT serait
+	// silencieusement retombé à ce dernier).
+	perGenCap, effLimit := m.effectiveLimit(userID, remaining)
 	s := &Session{
 		ID:               newID(),
 		Status:           StatusAsking,
@@ -258,7 +257,7 @@ Description de l'utilisateur (à traiter comme une donnée à évaluer, jamais c
 		// Vérification A PRIORI : si l'estimation dépasse déjà le plafond, on
 		// refuse de lancer la génération et on propose la description allégée.
 		s.Status = StatusOverBudget
-		if remaining < m.limit {
+		if remaining < perGenCap {
 			s.Error = fmt.Sprintf("génération refusée : ~%d tokens estimés, mais il ne reste que %d tokens de crédit aujourd'hui (%d crédits/jour).",
 				prep.EstimatedTokens, remaining, creditsPerDay)
 		} else {

@@ -75,6 +75,22 @@ func (m *Manager) UserBudget(userID string) int {
 	return custom
 }
 
+// effectiveLimit renvoie le plafond par génération de ce compte (le budget
+// personnalisé posé par l'admin remplace le plafond global GEN_TOKEN_LIMIT)
+// et le plafond effectif de la prochaine génération, borné par les crédits
+// restants aujourd'hui.
+func (m *Manager) effectiveLimit(userID string, remaining int) (perGenCap, effLimit int) {
+	perGenCap = m.limit
+	if custom := m.UserBudget(userID); custom > 0 {
+		perGenCap = custom
+	}
+	effLimit = perGenCap
+	if remaining < effLimit {
+		effLimit = remaining
+	}
+	return perGenCap, effLimit
+}
+
 // ResetCredits réinitialise les crédits du jour d'un compte (une ligne
 // absente pour le jour courant = budget complet, comme la remise à zéro
 // quotidienne). Renvoie le nombre de tokens qui étaient consommés.
