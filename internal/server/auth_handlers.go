@@ -40,8 +40,11 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		// Crédits journaliers de génération IA (remis à zéro chaque jour) :
 		// tokens encore disponibles aujourd'hui et budget total du jour.
 		"gen_tokens_remaining":   s.gen.RemainingTokens(u.ID),
-		"gen_daily_token_budget": s.gen.DailyTokenBudget(),
+		"gen_daily_token_budget": s.gen.DailyTokenBudget(u.ID),
 		"gen_credits_per_day":    s.gen.CreditsPerDay(),
+		// Ouvre l'entrée "Admin" de la sidebar (les routes /api/admin
+		// re-vérifient l'email à chaque requête, ceci n'est qu'un hint d'UI).
+		"is_admin": s.cfg.IsAdminEmail(u.Email),
 	})
 }
 
@@ -90,6 +93,11 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if err := s.auth.SetSession(w, u); err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	// Mémorise le compte (id Google → email/nom/photo) : c'est ce qui permet à
+	// l'espace admin d'afficher des comptes lisibles plutôt que des ids opaques.
+	if err := s.users.Upsert(u.ID, u.Email, u.Name, u.Picture); err != nil {
+		s.log.Warn("enregistrement du compte impossible", "user", u.ID, "err", err)
 	}
 	// Retour direct dans le studio (la racine est la landing marketing).
 	next := "/app"
