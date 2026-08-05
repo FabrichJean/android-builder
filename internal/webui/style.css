@@ -181,6 +181,9 @@
     color: var(--muted); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
     transition: background .15s, color .15s;
   }
+  /* display:flex ci-dessus écraserait l'attribut hidden (bouton Admin,
+     réservé aux emails de ADMIN_EMAILS) : on le rétablit explicitement. */
+  .sb-item[hidden] { display: none; }
   .sb-item .ic { flex: none; }
   .sb-item:hover { color: var(--text); background: rgba(224,192,125,0.06); }
   .sb-item.active { color: var(--sand); background: var(--sand-soft); }

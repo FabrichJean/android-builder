@@ -84,6 +84,9 @@ export async function initAccount() {
     setAvatar(data.user);
     setLoggedInMode(!!data.gen, !!data.gen_banned);
     if (data.is_admin) enableAdmin();
+    // Non-admin arrivé sur /admin par URL directe : retour à l'accueil (les
+    // routes /api/admin refusent de toute façon côté serveur).
+    else if (location.pathname === "/admin") switchView("home");
     renderCredits(data.gen_tokens_remaining, data.gen_daily_token_budget, data.gen_credits_per_day);
     await loadServerHistory();
   } catch {
