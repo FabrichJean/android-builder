@@ -93,6 +93,7 @@ func New(bin string, limit int, db *sql.DB, log *slog.Logger) *Manager {
 	warn := func(msg string, args ...any) { log.Warn(msg, args...) }
 	ensureAbuseSchema(db, warn)
 	ensureCreditsSchema(db, warn)
+	ensureBudgetsSchema(db, warn)
 	return &Manager{
 		bin: bin, limit: limit, db: db, log: log,
 		sessions: make(map[string]*Session),
@@ -162,7 +163,7 @@ func (m *Manager) Prepare(ctx context.Context, userID, desc string) (*Session, e
 			Status:           StatusNoCredits,
 			CreditsRemaining: 0,
 			Error: fmt.Sprintf("crédits de génération épuisés pour aujourd'hui (%d crédits = %d tokens/jour) — reviens demain.",
-				creditsPerDay, dailyTokenBudget),
+				creditsPerDay, m.dailyBudget(userID)),
 		}, nil
 	}
 	// Étape 1 du prompt parser : nettoyage mécanique, sans appel réseau.
