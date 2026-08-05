@@ -22,7 +22,7 @@ async function loadServerHistory() {
   } catch { /* API indisponible : on garde l'historique local */ }
 }
 
-// Jauge de crédits IA dans le menu du compte : 5 crédits/jour = 5000 tokens
+// Jauge de crédits IA dans le menu du compte : 5 crédits/jour = 10000 tokens
 // (par défaut, valeurs réelles renvoyées par le serveur), remis à zéro chaque
 // nuit. Masquée si la génération IA n'est pas proposée à ce compte.
 function renderCredits(tokensRemaining, dailyBudget, creditsPerDay) {

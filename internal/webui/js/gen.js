@@ -246,7 +246,7 @@ function renderGenBanned(s) {
   genToggle.title = "Génération IA désactivée pour ce compte (trop de demandes refusées)";
 }
 
-// Crédits journaliers épuisés (5 crédits = 5000 tokens/jour, remis à zéro le
+// Crédits journaliers épuisés (5 crédits = 10000 tokens/jour, remis à zéro le
 // lendemain) : le bouton reste actif, la limite se lève automatiquement au
 // jour suivant.
 function renderGenNoCredits(s) {

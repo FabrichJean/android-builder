@@ -93,6 +93,9 @@ docker build -t android-builder .
 docker run --rm -p 8080:8080 --env-file .env android-builder
 ```
 
+Pour un déploiement en production (reverse proxy/HTTPS, service systemd,
+sauvegardes, mise à jour, sécurité), voir [DEPLOY.md](DEPLOY.md).
+
 ## API
 
 ### Créer un build
