@@ -4,10 +4,14 @@
 // ensuite location.pathname pour afficher la bonne vue.
 import { $ } from "./core.js";
 
-const sbViews = { home: $("view-home"), history: $("view-history") };
-const VIEW_PATH = { home: "/app", history: "/historique" };
+const sbViews = { home: $("view-home"), history: $("view-history"), admin: $("view-admin") };
+const VIEW_PATH = { home: "/app", history: "/historique", admin: "/admin" };
 
-export function viewForPath(path) { return path === "/historique" ? "history" : "home"; }
+export function viewForPath(path) {
+  if (path === "/historique") return "history";
+  if (path === "/admin") return "admin";
+  return "home";
+}
 
 export function switchView(name, push = true) {
   document.querySelectorAll(".sb-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
