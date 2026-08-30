@@ -80,3 +80,61 @@ func TestUserBudgetsAndReset(t *testing.T) {
 		t.Fatalf("UsageToday après reset global = %v, attendu vide", usage)
 	}
 }
+
+// TestBanUnbanAndRejections vérifie le bannissement après trop de refus, la
+// conservation des prompts refusés pour revue admin, et le débannissement.
+func TestBanUnbanAndRejections(t *testing.T) {
+	m := New("claude", 10000, openTestDB(t), slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
+	if m.IsBanned("u1") {
+		t.Fatal("compte neuf ne devrait pas être banni")
+	}
+	if m.recordRejection("u1", "premier prompt refusé", "hors-sujet") {
+		t.Fatal("un seul refus ne devrait pas bannir (maxRejections=2)")
+	}
+	if m.IsBanned("u1") {
+		t.Fatal("pas encore banni après 1 refus")
+	}
+	if !m.recordRejection("u1", "second prompt refusé", "contenu interdit") {
+		t.Fatal("le 2e refus devrait bannir (maxRejections=2)")
+	}
+	if !m.IsBanned("u1") {
+		t.Fatal("devrait être banni après 2 refus")
+	}
+
+	rejections, err := m.Rejections("u1")
+	if err != nil {
+		t.Fatalf("Rejections: %v", err)
+	}
+	if len(rejections) != 2 {
+		t.Fatalf("Rejections = %d entrées, attendu 2", len(rejections))
+	}
+	// Ordre du plus récent au plus ancien.
+	if rejections[0].Description != "second prompt refusé" || rejections[0].Reason != "contenu interdit" {
+		t.Fatalf("rejections[0] = %+v, attendu le refus le plus récent en premier", rejections[0])
+	}
+	if rejections[1].Description != "premier prompt refusé" {
+		t.Fatalf("rejections[1] = %+v, attendu le premier refus", rejections[1])
+	}
+
+	// Débannir : le compte redevient utilisable...
+	if err := m.Unban("u1"); err != nil {
+		t.Fatalf("Unban: %v", err)
+	}
+	if m.IsBanned("u1") {
+		t.Fatal("ne devrait plus être banni après Unban")
+	}
+	// ...et le compteur repart de zéro (un refus de plus ne re-bannit pas
+	// immédiatement le compte tout juste débanni).
+	if m.recordRejection("u1", "troisième prompt refusé", "hors-sujet") {
+		t.Fatal("après débannissement, le compteur doit repartir de zéro")
+	}
+	if m.IsBanned("u1") {
+		t.Fatal("1 refus après débannissement ne doit pas re-bannir")
+	}
+	// L'historique des refus, lui, est conservé (trace pour l'admin).
+	rejections, err = m.Rejections("u1")
+	if err != nil || len(rejections) != 3 {
+		t.Fatalf("Rejections après unban = (%d, %v), attendu 3 conservées", len(rejections), err)
+	}
+}
