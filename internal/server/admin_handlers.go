@@ -99,6 +99,35 @@ func (s *Server) handleAdminResetUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "tokens_restored": used})
 }
 
+// handleAdminRejections liste les prompts refusés d'un compte (filtre
+// sécurité/pertinence) — sert à comprendre un bannissement avant de décider
+// de le lever.
+func (s *Server) handleAdminRejections(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	userID := r.PathValue("id")
+	rejections, err := s.gen.Rejections(userID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"rejections": rejections})
+}
+
+// handleAdminUnban lève le bannissement de génération IA d'un compte.
+func (s *Server) handleAdminUnban(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	userID := r.PathValue("id")
+	if err := s.gen.Unban(userID); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // handleAdminResetAll réinitialise les crédits du jour de tous les comptes.
 func (s *Server) handleAdminResetAll(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAdmin(w, r) {
