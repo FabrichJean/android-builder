@@ -1467,3 +1467,16 @@
   .admin-budget-input:focus { outline: none; border-color: var(--sand); }
   .admin-save, .admin-reset { padding: 7px 11px; border-radius: 9px; font-size: 12.5px; white-space: nowrap; }
   .admin-reset[disabled] { opacity: 0.4; cursor: default; }
+  .admin-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .admin-unban { color: var(--sand); border-color: var(--border-2); }
+  .admin-rejections-row td { padding: 0 10px 14px; border-bottom: 1px solid var(--border); }
+  .admin-rejections-body {
+    background: var(--well, rgba(255,255,255,0.04)); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px; color: var(--muted); font-size: 13px;
+  }
+  .admin-rej-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .admin-rej-list li + li { padding-top: 12px; border-top: 1px solid var(--border); }
+  .admin-rej-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .admin-rej-when { color: var(--faint); font-size: 12px; }
+  .admin-rej-reason { color: var(--sand); font-size: 12px; font-weight: 650; }
+  .admin-rej-desc { margin: 0; color: var(--text); white-space: pre-wrap; word-break: break-word; }

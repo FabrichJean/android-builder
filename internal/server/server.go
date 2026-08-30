@@ -69,6 +69,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/admin/users", s.handleAdminUsers)
 	mux.HandleFunc("PUT /api/admin/users/{id}/budget", s.handleAdminSetBudget)
 	mux.HandleFunc("POST /api/admin/users/{id}/reset-credits", s.handleAdminResetUser)
+	mux.HandleFunc("GET /api/admin/users/{id}/rejections", s.handleAdminRejections)
+	mux.HandleFunc("POST /api/admin/users/{id}/unban", s.handleAdminUnban)
 	mux.HandleFunc("POST /api/admin/reset-credits", s.handleAdminResetAll)
 	mux.HandleFunc("GET /auth/google/login", s.handleGoogleLogin)
 	mux.HandleFunc("GET /auth/google/callback", s.handleGoogleCallback)

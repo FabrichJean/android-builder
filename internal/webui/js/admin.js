@@ -26,6 +26,10 @@ function userCell(u) {
     </div>`;
 }
 
+function fmtWhen(ms) {
+  return new Date(ms).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
 function render(users) {
   const tbody = $("adminUsers");
   if (!users.length) {
@@ -51,11 +55,30 @@ function render(users) {
         </div>
       </td>
       <td>
-        <button type="button" class="btn-ghost admin-reset" ${u.tokens_used ? "" : "disabled"}
-          title="Remettre les crédits du jour à zéro">Réinitialiser</button>
+        <div class="admin-actions">
+          <button type="button" class="btn-ghost admin-reset" ${u.tokens_used ? "" : "disabled"}
+            title="Remettre les crédits du jour à zéro">Réinitialiser</button>
+          <button type="button" class="btn-ghost admin-rejections" title="Voir les prompts refusés">Prompts refusés</button>
+          ${u.banned ? `<button type="button" class="btn-ghost admin-unban" title="Lever le bannissement de génération IA">Débannir</button>` : ""}
+        </div>
       </td>
+    </tr>
+    <tr class="admin-rejections-row" data-rej-for="${esc(u.id)}" hidden>
+      <td colspan="4"><div class="admin-rejections-body"></div></td>
     </tr>`;
   }).join("");
+}
+
+function renderRejections(list) {
+  if (!list || !list.length) return `<p class="admin-empty">Aucun prompt refusé enregistré pour ce compte.</p>`;
+  return `<ul class="admin-rej-list">${list.map((r) => `
+    <li>
+      <div class="admin-rej-head">
+        <span class="admin-rej-when">${esc(fmtWhen(r.created_at))}</span>
+        ${r.reason ? `<span class="admin-rej-reason">${esc(r.reason)}</span>` : ""}
+      </div>
+      <p class="admin-rej-desc">${esc(r.description)}</p>
+    </li>`).join("")}</ul>`;
 }
 
 export async function loadAdmin() {
@@ -99,6 +122,26 @@ $("adminUsers").addEventListener("click", async (e) => {
     })) loadAdmin();
   } else if (e.target.closest(".admin-reset")) {
     if (await call(`/api/admin/users/${encodeURIComponent(id)}/reset-credits`, { method: "POST" })) loadAdmin();
+  } else if (e.target.closest(".admin-unban")) {
+    if (!confirm("Lever le bannissement de génération IA pour ce compte ?")) return;
+    if (await call(`/api/admin/users/${encodeURIComponent(id)}/unban`, { method: "POST" })) loadAdmin();
+  } else if (e.target.closest(".admin-rejections")) {
+    const rejRow = $("adminUsers").querySelector(`tr.admin-rejections-row[data-rej-for="${CSS.escape(id)}"]`);
+    const body = rejRow.querySelector(".admin-rejections-body");
+    const opening = rejRow.hidden;
+    rejRow.hidden = !opening;
+    if (opening && !body.dataset.loaded) {
+      body.textContent = "Chargement…";
+      try {
+        const res = await fetch(`/api/admin/users/${encodeURIComponent(id)}/rejections`);
+        const data = await res.json();
+        if (!res.ok) { body.textContent = data.error || "chargement impossible"; return; }
+        body.innerHTML = renderRejections(data.rejections);
+        body.dataset.loaded = "1";
+      } catch {
+        body.textContent = "API indisponible";
+      }
+    }
   }
 });
 
