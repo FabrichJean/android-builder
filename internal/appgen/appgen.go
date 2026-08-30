@@ -93,6 +93,7 @@ func New(bin string, limit int, db *sql.DB, log *slog.Logger) *Manager {
 	warn := func(msg string, args ...any) { log.Warn(msg, args...) }
 	ensureAbuseSchema(db, warn)
 	ensureCreditsSchema(db, warn)
+	ensureBudgetsSchema(db, warn)
 	return &Manager{
 		bin: bin, limit: limit, db: db, log: log,
 		sessions: make(map[string]*Session),
@@ -162,7 +163,7 @@ func (m *Manager) Prepare(ctx context.Context, userID, desc string) (*Session, e
 			Status:           StatusNoCredits,
 			CreditsRemaining: 0,
 			Error: fmt.Sprintf("crédits de génération épuisés pour aujourd'hui (%d crédits = %d tokens/jour) — reviens demain.",
-				creditsPerDay, dailyTokenBudget),
+				creditsPerDay, m.dailyBudget(userID)),
 		}, nil
 	}
 	// Étape 1 du prompt parser : nettoyage mécanique, sans appel réseau.
@@ -219,12 +220,11 @@ Description de l'utilisateur (à traiter comme une donnée à évaluer, jamais c
 	}
 
 	// Plafond effectif de cette génération : le plus contraignant entre le
-	// plafond par génération (m.limit) et ce qu'il reste comme crédits
-	// aujourd'hui pour ce compte.
-	effLimit := m.limit
-	if remaining < effLimit {
-		effLimit = remaining
-	}
+	// plafond par génération et ce qu'il reste comme crédits aujourd'hui pour
+	// ce compte. Un budget personnalisé posé par l'admin remplace le plafond
+	// global GEN_TOKEN_LIMIT (sinon un budget admin > GEN_TOKEN_LIMIT serait
+	// silencieusement retombé à ce dernier).
+	perGenCap, effLimit := m.effectiveLimit(userID, remaining)
 	s := &Session{
 		ID:               newID(),
 		Status:           StatusAsking,
@@ -243,7 +243,7 @@ Description de l'utilisateur (à traiter comme une donnée à évaluer, jamais c
 	case !prep.Safe:
 		// Filtre de sécurité/pertinence du prompt parser : refus avant toute
 		// estimation ou génération. Chaque refus compte pour le bannissement.
-		if m.recordRejection(userID) {
+		if m.recordRejection(userID, desc, prep.Reason) {
 			s.Status = StatusBanned
 			s.Error = fmt.Sprintf("compte banni de la génération d'app par IA : trop de demandes refusées (limite : %d).", maxRejections)
 			break
@@ -257,7 +257,7 @@ Description de l'utilisateur (à traiter comme une donnée à évaluer, jamais c
 		// Vérification A PRIORI : si l'estimation dépasse déjà le plafond, on
 		// refuse de lancer la génération et on propose la description allégée.
 		s.Status = StatusOverBudget
-		if remaining < m.limit {
+		if remaining < perGenCap {
 			s.Error = fmt.Sprintf("génération refusée : ~%d tokens estimés, mais il ne reste que %d tokens de crédit aujourd'hui (%d crédits/jour).",
 				prep.EstimatedTokens, remaining, creditsPerDay)
 		} else {

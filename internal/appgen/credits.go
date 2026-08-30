@@ -41,19 +41,21 @@ func ensureCreditsSchema(db *sql.DB, warn func(msg string, args ...any)) {
 func today() string { return time.Now().UTC().Format("2006-01-02") }
 
 // remainingTokens renvoie le budget de tokens de génération encore
-// disponible aujourd'hui pour ce compte. Sans base (db nil) ou pour un
-// utilisateur anonyme, le budget plein est renvoyé (pas de suivi possible).
+// disponible aujourd'hui pour ce compte (budget personnalisé par l'admin ou
+// défaut global). Sans base (db nil) ou pour un utilisateur anonyme, le
+// budget plein est renvoyé (pas de suivi possible).
 func (m *Manager) remainingTokens(userID string) int {
+	budget := m.dailyBudget(userID)
 	if m.db == nil || userID == "" {
-		return dailyTokenBudget
+		return budget
 	}
 	var used int
 	err := m.db.QueryRow(`SELECT tokens_used FROM appgen_credits WHERE user_id = ? AND day = ?`,
 		userID, today()).Scan(&used)
 	if err != nil {
-		return dailyTokenBudget // pas de ligne aujourd'hui = rien consommé
+		return budget // pas de ligne aujourd'hui = rien consommé
 	}
-	remaining := dailyTokenBudget - used
+	remaining := budget - used
 	if remaining < 0 {
 		remaining = 0
 	}
@@ -81,8 +83,9 @@ func (m *Manager) addUsage(userID string, tokens int) {
 // disponible aujourd'hui pour ce compte (remise à zéro chaque jour).
 func (m *Manager) RemainingTokens(userID string) int { return m.remainingTokens(userID) }
 
-// DailyTokenBudget renvoie le budget quotidien total de tokens de génération.
-func (m *Manager) DailyTokenBudget() int { return dailyTokenBudget }
+// DailyTokenBudget renvoie le budget quotidien total de tokens de génération
+// de ce compte (personnalisé par l'admin ou défaut global).
+func (m *Manager) DailyTokenBudget(userID string) int { return m.dailyBudget(userID) }
 
 // CreditsPerDay renvoie le nombre de crédits quotidiens (1 crédit = 2000 tokens).
 func (m *Manager) CreditsPerDay() int { return creditsPerDay }

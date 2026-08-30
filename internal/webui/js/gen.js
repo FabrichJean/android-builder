@@ -158,10 +158,10 @@ function genSubscribe(id) {
   };
 }
 
-// Récupère le dist généré et l'installe comme projet importé, prêt à être
-// édité (bouton "Éditer le code" du résumé) ou buildé tel quel — l'utilisateur
-// valide lui-même l'envoi via le bouton du formulaire (pas d'auto-submit, pour
-// laisser la fenêtre de relecture/édition avant de consommer un build).
+// Récupère le dist généré et l'installe comme projet importé, puis enchaîne
+// aussitôt sur le build (mêmes chemin et validations que le bouton "Build" :
+// on redéclenche simplement la soumission du formulaire). Le code généré
+// reste éditable après coup (bouton ✎ du résumé), avant un futur build.
 async function genFinish(s) {
   try {
     const res = await fetch(`/api/generate/${s.id}/dist.zip`);
@@ -174,21 +174,12 @@ async function genFinish(s) {
     }
     setGenMode(false);
     setDistWithFiles(blob, `App générée par IA · ${s.tokens_used} tokens`, files);
-    renderGenDone(s);
+    genReset();
+    $("form").requestSubmit();
   } catch (err) {
     genReset();
     fail(err.message);
   }
-}
-
-function renderGenDone(s) {
-  genPanel.hidden = false;
-  genPanel.innerHTML = `
-    <div class="gen-note">App générée (${s.tokens_used} tokens) — relis le code, édite-le si besoin (bouton ✎ du résumé ci-dessus), puis lance le build.</div>
-    <div class="gen-actions">
-      <button type="button" class="btn-ghost" id="genDoneClose">Fermer</button>
-    </div>`;
-  $("genDoneClose").addEventListener("click", genReset);
 }
 
 function renderGenOverBudget(s) {

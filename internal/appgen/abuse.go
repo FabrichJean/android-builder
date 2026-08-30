@@ -2,6 +2,7 @@ package appgen
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -18,7 +19,24 @@ CREATE TABLE IF NOT EXISTS appgen_abuse (
 	banned         INTEGER NOT NULL DEFAULT 0,
 	updated_at     INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS appgen_rejections (
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id     TEXT NOT NULL,
+	description TEXT NOT NULL,
+	reason      TEXT NOT NULL,
+	created_at  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS appgen_rejections_user ON appgen_rejections(user_id, id DESC);
 `
+
+// Rejection est un prompt refusé par le filtre de sécurité/pertinence,
+// conservé pour que l'admin puisse comprendre pourquoi un compte a été banni
+// avant de décider de le débannir.
+type Rejection struct {
+	Description string `json:"description"`
+	Reason      string `json:"reason"`
+	CreatedAt   int64  `json:"created_at"` // Unix ms
+}
 
 // IsBanned indique si ce compte est banni de la génération d'app par IA.
 // Sans base (db nil, ex. en test) ou pour un utilisateur anonyme, jamais banni.
@@ -33,14 +51,20 @@ func (m *Manager) IsBanned(userID string) bool {
 	return banned != 0
 }
 
-// recordRejection incrémente le compteur de prompts refusés pour ce compte et
-// le bannit si la limite est atteinte. Renvoie true si le compte vient de
-// passer banni (utile pour informer immédiatement l'utilisateur).
-func (m *Manager) recordRejection(userID string) bool {
+// recordRejection incrémente le compteur de prompts refusés pour ce compte,
+// mémorise le prompt et sa raison de refus (pour revue admin), et bannit le
+// compte si la limite est atteinte. Renvoie true si le compte vient de passer
+// banni (utile pour informer immédiatement l'utilisateur).
+func (m *Manager) recordRejection(userID, description, reason string) bool {
 	if m.db == nil || userID == "" {
 		return false
 	}
 	now := time.Now().UnixMilli()
+	if _, err := m.db.Exec(`
+		INSERT INTO appgen_rejections (user_id, description, reason, created_at) VALUES (?, ?, ?, ?)
+	`, userID, description, reason, now); err != nil {
+		m.log.Warn("enregistrement du prompt refusé impossible", "user", userID, "err", err)
+	}
 	if _, err := m.db.Exec(`
 		INSERT INTO appgen_abuse (user_id, rejected_count, banned, updated_at)
 		VALUES (?, 1, 0, ?)
@@ -64,6 +88,43 @@ func (m *Manager) recordRejection(userID string) bool {
 		return true
 	}
 	return false
+}
+
+// Unban lève le bannissement d'un compte et remet son compteur de refus à
+// zéro (sinon le refus suivant le re-bannirait immédiatement). L'historique
+// des prompts refusés (Rejections) est conservé, comme trace de la décision.
+func (m *Manager) Unban(userID string) error {
+	if m.db == nil {
+		return fmt.Errorf("suivi des abus désactivé (pas de base)")
+	}
+	_, err := m.db.Exec(`UPDATE appgen_abuse SET banned = 0, rejected_count = 0 WHERE user_id = ?`, userID)
+	return err
+}
+
+// Rejections renvoie les prompts refusés d'un compte, du plus récent au plus
+// ancien, pour permettre à l'admin de comprendre un bannissement avant de
+// décider de lever ou non le ban.
+func (m *Manager) Rejections(userID string) ([]Rejection, error) {
+	if m.db == nil {
+		return nil, nil
+	}
+	rows, err := m.db.Query(`
+		SELECT description, reason, created_at FROM appgen_rejections
+		WHERE user_id = ? ORDER BY id DESC LIMIT 50
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Rejection
+	for rows.Next() {
+		var r Rejection
+		if err := rows.Scan(&r.Description, &r.Reason, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 // ensureAbuseSchema crée la table de suivi des abus si besoin. Best-effort :

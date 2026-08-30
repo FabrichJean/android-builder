@@ -23,6 +23,8 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.webkit.ServiceWorkerClientCompat
+import androidx.webkit.ServiceWorkerControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -57,6 +59,23 @@ class MainActivity : Activity() {
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/", WwwPathHandler(assets))
             .build()
+
+        // Certains frameworks (Flutter web, Next.js/Vite en mode PWA, Angular
+        // service worker...) enregistrent un service worker qui prend en
+        // charge lui-même les requêtes une fois actif — y compris son propre
+        // précache initial des assets. Sans ceci, ces requêtes partent en
+        // dehors du WebViewClient ci-dessous (donc jamais servies par
+        // assetLoader) et échouent contre le faux domaine appassets.*, ce qui
+        // casse silencieusement l'app après le tout premier chargement.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_BASIC_USAGE) &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_SHOULD_INTERCEPT_REQUEST)
+        ) {
+            ServiceWorkerControllerCompat.getInstance().serviceWorkerWebSettings.allowFileAccess = false
+            ServiceWorkerControllerCompat.getInstance().setServiceWorkerClient(object : ServiceWorkerClientCompat() {
+                override fun shouldInterceptRequest(request: WebResourceRequest): WebResourceResponse? =
+                    assetLoader.shouldInterceptRequest(request.url)
+            })
+        }
 
         // Console de debug optionnelle : widget flottant réductible et déplaçable.
         val debug = resources.getBoolean(R.bool.debug_console)

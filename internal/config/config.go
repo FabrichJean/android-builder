@@ -63,6 +63,23 @@ type Config struct {
 	// Génération d'app par IA (CLI claude du serveur, réservée aux comptes).
 	ClaudeBin     string // binaire du CLI claude (défaut: "claude" dans le PATH)
 	GenTokenLimit int    // plafond de tokens de sortie pour une génération
+
+	// Espace admin : emails (Google) autorisés, séparés par des virgules dans
+	// ADMIN_EMAILS. Vide = pas d'admin (les routes /api/admin répondent 403).
+	AdminEmails []string
+}
+
+// IsAdminEmail indique si cet email fait partie des administrateurs.
+func (c *Config) IsAdminEmail(email string) bool {
+	if email == "" {
+		return false
+	}
+	for _, a := range c.AdminEmails {
+		if strings.EqualFold(a, email) {
+			return true
+		}
+	}
+	return false
 }
 
 // Load lit la configuration depuis les variables d'environnement et valide
@@ -87,6 +104,11 @@ func Load() (*Config, error) {
 		SessionSecret:      os.Getenv("SESSION_SECRET"),
 		ClaudeBin:          env("CLAUDE_BIN", "claude"),
 		GenTokenLimit:      envInt("GEN_TOKEN_LIMIT", 10000),
+	}
+	for _, e := range strings.Split(os.Getenv("ADMIN_EMAILS"), ",") {
+		if e = strings.TrimSpace(e); e != "" {
+			c.AdminEmails = append(c.AdminEmails, e)
+		}
 	}
 	if c.SessionSecret == "" {
 		// Pas fourni : on en génère un pour cette exécution (les sessions ne

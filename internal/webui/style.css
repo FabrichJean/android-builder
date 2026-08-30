@@ -181,6 +181,9 @@
     color: var(--muted); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
     transition: background .15s, color .15s;
   }
+  /* display:flex ci-dessus écraserait l'attribut hidden (bouton Admin,
+     réservé aux emails de ADMIN_EMAILS) : on le rétablit explicitement. */
+  .sb-item[hidden] { display: none; }
   .sb-item .ic { flex: none; }
   .sb-item:hover { color: var(--text); background: rgba(224,192,125,0.06); }
   .sb-item.active { color: var(--sand); background: var(--sand-soft); }
@@ -1417,3 +1420,63 @@
     color: var(--faint); font-size: 12px;
   }
   footer code { color: var(--muted); }
+
+  /* ---- espace admin (/admin) : budgets et crédits IA par utilisateur ---- */
+  .admin-note { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .admin-reset-all { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .admin-reset-all .ic { width: 14px; height: 14px; }
+  .admin-table-wrap { overflow-x: auto; }
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .admin-table th {
+    text-align: left; font-weight: 650; color: var(--faint);
+    padding: 8px 10px; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .admin-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .admin-table tr:last-child td { border-bottom: none; }
+  .admin-empty { color: var(--muted); text-align: center; padding: 24px 10px; }
+  .admin-user { display: flex; align-items: center; gap: 10px; min-width: 220px; }
+  .admin-avatar {
+    position: relative; width: 32px; height: 32px; flex: none;
+    border-radius: 50%; overflow: hidden; background: var(--sand-soft);
+    display: grid; place-items: center;
+    color: var(--sand); font-weight: 700; font-size: 13px;
+  }
+  .admin-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .admin-user-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .admin-user-name { font-weight: 650; color: var(--text); }
+  .admin-user-sub { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-tag {
+    display: inline-block; padding: 1px 7px; border-radius: 999px;
+    font-size: 11px; font-weight: 650; vertical-align: 1px;
+    background: var(--sand-soft); color: var(--sand);
+  }
+  .admin-tag.banned { background: rgba(224, 122, 95, 0.15); color: var(--err, #e07a5f); }
+  .admin-usage { display: flex; flex-direction: column; gap: 5px; min-width: 130px; color: var(--muted); }
+  .admin-usage-track {
+    display: block; height: 5px; border-radius: 999px;
+    background: var(--well, rgba(255,255,255,0.06)); overflow: hidden;
+  }
+  .admin-usage-track > span { display: block; height: 100%; border-radius: 999px; background: var(--sand); }
+  .admin-budget { display: flex; align-items: center; gap: 6px; }
+  .admin-budget-input {
+    width: 130px; padding: 7px 9px; border-radius: 9px;
+    border: 1px solid var(--border-2); background: transparent;
+    color: var(--text); font-family: inherit; font-size: 13px;
+  }
+  .admin-budget-input:focus { outline: none; border-color: var(--sand); }
+  .admin-save, .admin-reset { padding: 7px 11px; border-radius: 9px; font-size: 12.5px; white-space: nowrap; }
+  .admin-reset[disabled] { opacity: 0.4; cursor: default; }
+  .admin-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .admin-unban { color: var(--sand); border-color: var(--border-2); }
+  .admin-rejections-row td { padding: 0 10px 14px; border-bottom: 1px solid var(--border); }
+  .admin-rejections-body {
+    background: var(--well, rgba(255,255,255,0.04)); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px; color: var(--muted); font-size: 13px;
+  }
+  .admin-rej-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .admin-rej-list li + li { padding-top: 12px; border-top: 1px solid var(--border); }
+  .admin-rej-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .admin-rej-when { color: var(--faint); font-size: 12px; }
+  .admin-rej-reason { color: var(--sand); font-size: 12px; font-weight: 650; }
+  .admin-rej-desc { margin: 0; color: var(--text); white-space: pre-wrap; word-break: break-word; }
