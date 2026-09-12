@@ -1,0 +1,7 @@
+2026-08-05T20:14:22: {"time":"2026-08-05T20:14:22.072191835+02:00","level":"INFO","msg":"connexion Google activée","redirect":"https://android-build.duckdns.org/auth/google/callback"}
+2026-08-05T20:14:22: {"time":"2026-08-05T20:14:22.386878899+02:00","level":"INFO","msg":"génération d'app par IA activée","bin":"/root/.local/bin/claude","limite_tokens":10000}
+2026-08-05T20:14:22: {"time":"2026-08-05T20:14:22.387422575+02:00","level":"INFO","msg":"serveur démarré","port":"8888","repo":"FabrichJean/android-builder"}
+2026-08-05T20:24:45: {"time":"2026-08-05T20:24:45.658816792+02:00","level":"INFO","msg":"connexion Google activée","redirect":"https://android-build.duckdns.org/auth/google/callback"}
+2026-08-05T20:24:45: {"time":"2026-08-05T20:24:45.664617236+02:00","level":"INFO","msg":"génération d'app par IA activée","bin":"/root/.local/bin/claude","limite_tokens":10000}
+2026-08-05T20:24:45: {"time":"2026-08-05T20:24:45.664990727+02:00","level":"INFO","msg":"serveur démarré","port":"8888","repo":"FabrichJean/android-builder"}
+2026-08-12T13:20:11: {"time":"2026-08-12T13:20:11.056360158+02:00","level":"INFO","msg":"app générée","session":"1b84e1c00d37a377","tokens":5811,"taille":5234}

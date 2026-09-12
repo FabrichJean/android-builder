@@ -1,0 +1,29 @@
+2026-08-30T09:40:52: {"time":"2026-08-30T09:40:52.611165988+02:00","level":"INFO","msg":"connexion Google activée","redirect":"https://android-build.duckdns.org/auth/google/callback"}
+2026-08-30T09:40:52: {"time":"2026-08-30T09:40:52.611239812+02:00","level":"INFO","msg":"génération d'app par IA activée","bin":"/root/.local/bin/claude","limite_tokens":10000}
+2026-08-30T09:40:52: {"time":"2026-08-30T09:40:52.614391034+02:00","level":"INFO","msg":"serveur démarré","port":"8888","repo":"FabrichJean/android-builder"}
+2026-08-30T10:00:09: {"time":"2026-08-30T10:00:09.414413263+02:00","level":"INFO","msg":"app générée","session":"f25385749181a56e","tokens":11779,"taille":9906}
+2026-08-30T10:01:41: {"time":"2026-08-30T10:01:41.981220601+02:00","level":"INFO","msg":"run repéré","build_id":"d47bf999d309b8df","run_id":33300572516,"url":"https://github.com/FabrichJean/android-builder/actions/runs/33300572516"}
+2026-08-30T10:01:49: {"time":"2026-08-30T10:01:49.115170212+02:00","level":"INFO","msg":"miniature générée","build_id":"d47bf999d309b8df"}
+2026-08-30T10:03:09: {"time":"2026-08-30T10:03:09.828781025+02:00","level":"INFO","msg":"APK écrit","build_id":"d47bf999d309b8df","chemin":"releases/moniteur-de-batterie-d47bf999d309b8df.apk","taille":1276324}
+2026-08-30T10:18:24: {"time":"2026-08-30T10:18:24.579017089+02:00","level":"INFO","msg":"app générée","session":"496882f4049f4725","tokens":4081,"taille":7688}
+2026-08-30T10:19:19: {"time":"2026-08-30T10:19:19.742186536+02:00","level":"INFO","msg":"connexion Google activée","redirect":"https://android-build.duckdns.org/auth/google/callback"}
+2026-08-30T10:19:19: {"time":"2026-08-30T10:19:19.742256809+02:00","level":"INFO","msg":"génération d'app par IA activée","bin":"/root/.local/bin/claude","limite_tokens":10000}
+2026-08-30T10:19:19: {"time":"2026-08-30T10:19:19.742618293+02:00","level":"INFO","msg":"serveur démarré","port":"8888","repo":"FabrichJean/android-builder"}
+2026-08-30T10:25:37: {"time":"2026-08-30T10:25:37.689713294+02:00","level":"INFO","msg":"app générée","session":"46879d6e5e483e9d","tokens":4492,"taille":7798}
+2026-08-30T10:25:44: {"time":"2026-08-30T10:25:44.869972316+02:00","level":"INFO","msg":"run repéré","build_id":"5a112a299052df97","run_id":33301556345,"url":"https://github.com/FabrichJean/android-builder/actions/runs/33301556345"}
+2026-08-30T10:25:55: {"time":"2026-08-30T10:25:55.390329067+02:00","level":"INFO","msg":"miniature générée","build_id":"5a112a299052df97"}
+2026-08-30T10:26:55: {"time":"2026-08-30T10:26:55.333473386+02:00","level":"INFO","msg":"APK écrit","build_id":"5a112a299052df97","chemin":"releases/livre-5a112a299052df97.apk","taille":1299740}
+2026-08-30T18:01:43: {"time":"2026-08-30T18:01:43.432505371+02:00","level":"INFO","msg":"app générée","session":"f2b37041807a9ef8","tokens":7262,"taille":6092}
+2026-08-30T18:01:51: {"time":"2026-08-30T18:01:51.103560374+02:00","level":"INFO","msg":"run repéré","build_id":"147391879f07a213","run_id":33321285689,"url":"https://github.com/FabrichJean/android-builder/actions/runs/33321285689"}
+2026-08-30T18:02:12: {"time":"2026-08-30T18:02:12.477969468+02:00","level":"INFO","msg":"miniature générée","build_id":"147391879f07a213"}
+2026-08-30T18:02:58: {"time":"2026-08-30T18:02:58.217041275+02:00","level":"INFO","msg":"APK écrit","build_id":"147391879f07a213","chemin":"releases/pong-147391879f07a213.apk","taille":1293284}
+2026-09-04T16:51:39: {"time":"2026-09-04T16:51:39.097992253+02:00","level":"INFO","msg":"app générée","session":"5b2d4e06a4562942","tokens":6677,"taille":5811}
+2026-09-04T16:51:48: {"time":"2026-09-04T16:51:48.088554852+02:00","level":"INFO","msg":"run repéré","build_id":"5da926d233fdc60c","run_id":33886170098,"url":"https://github.com/FabrichJean/android-builder/actions/runs/33886170098"}
+2026-09-04T16:52:07: {"time":"2026-09-04T16:52:07.625273783+02:00","level":"INFO","msg":"miniature générée","build_id":"5da926d233fdc60c"}
+2026-09-04T16:53:09: {"time":"2026-09-04T16:53:09.398885678+02:00","level":"INFO","msg":"APK écrit","build_id":"5da926d233fdc60c","chemin":"releases/deminine-5da926d233fdc60c.apk","taille":1421900}
+2026-09-08T23:25:02: {"time":"2026-09-08T23:25:02.69897316+02:00","level":"INFO","msg":"connexion Google activée","redirect":"https://android-build.duckdns.org/auth/google/callback"}
+2026-09-08T23:25:02: {"time":"2026-09-08T23:25:02.71581779+02:00","level":"INFO","msg":"génération d'app par IA activée","bin":"/root/.local/bin/claude","limite_tokens":10000}
+2026-09-08T23:25:02: {"time":"2026-09-08T23:25:02.716364674+02:00","level":"INFO","msg":"serveur démarré","port":"8888","repo":"FabrichJean/android-builder"}
+2026-09-11T17:43:40: {"time":"2026-09-11T17:43:40.810880256+02:00","level":"INFO","msg":"connexion Google activée","redirect":"https://android-build.duckdns.org/auth/google/callback"}
+2026-09-11T17:43:40: {"time":"2026-09-11T17:43:40.811757652+02:00","level":"INFO","msg":"génération d'app par IA activée","bin":"/root/.local/bin/claude","limite_tokens":10000}
+2026-09-11T17:43:40: {"time":"2026-09-11T17:43:40.812233011+02:00","level":"INFO","msg":"serveur démarré","port":"8888","repo":"FabrichJean/android-builder"}
