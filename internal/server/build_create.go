@@ -139,6 +139,14 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var release func()
+	if method == methodServer {
+		var ok bool
+		if release, ok = s.acquireLocal(w, r); !ok {
+			return
+		}
+	}
+
 	id := newID()
 	build := &buildstore.Build{
 		ID:       id,
@@ -151,13 +159,17 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 		Status:   buildstore.StatusPending,
 	}
 	if err := s.store.Create(build); err != nil {
+		if release != nil {
+			release()
+		}
 		writeErr(w, http.StatusInternalServerError, "enregistrement du build impossible: "+err.Error())
 		return
 	}
 
 	if method == methodServer {
 		go s.runLocal(localParams{
-			ID: id, AppURL: req.URL, AppName: req.AppName, Package: req.Package,
+			Release: release,
+			ID:      id, AppURL: req.URL, AppName: req.AppName, Package: req.Package,
 			VersionName: req.VersionName, VersionCode: req.VersionCode, SplashBg: splashBg,
 			HideScrollbar: req.HideScrollbar, DebugConsole: req.DebugConsole, FixImages: req.FixImages,
 			BackgroundPlayer: req.BackgroundPlayer, PictureInPicture: req.PictureInPicture,
@@ -335,6 +347,13 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	var release func()
+	if method == methodServer {
+		var ok bool
+		if release, ok = s.acquireLocal(w, r); !ok {
+			return
+		}
+	}
 	build := &buildstore.Build{
 		ID:         id,
 		UserID:     s.currentUserID(r),
@@ -348,13 +367,17 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 		Status:     buildstore.StatusPending,
 	}
 	if err := s.store.Create(build); err != nil {
+		if release != nil {
+			release()
+		}
 		writeErr(w, http.StatusInternalServerError, "enregistrement du build impossible: "+err.Error())
 		return
 	}
 
 	if method == methodServer {
 		go s.runLocal(localParams{
-			ID: id, AppURL: appAssetURL, AppName: appName, Package: pkg,
+			Release: release,
+			ID:      id, AppURL: appAssetURL, AppName: appName, Package: pkg,
 			VersionName: vname, VersionCode: vcode, SplashBg: splashBg,
 			HideScrollbar: hideScrollbar, DebugConsole: debugConsole, FixImages: fixImages,
 			BackgroundPlayer: backgroundPlayer, PictureInPicture: pictureInPicture,

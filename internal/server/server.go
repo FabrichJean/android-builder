@@ -29,6 +29,7 @@ type Server struct {
 	sem    chan struct{} // limite les captures Chrome concurrentes
 	// Une seule compilation locale (Gradle) à la fois : gourmand en CPU/RAM.
 	localSem chan struct{}
+	limiter  *localLimiter // quotas / file d'attente du build par le serveur
 }
 
 func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, authMgr *auth.Manager, genMgr *appgen.Manager, log *slog.Logger) *Server {
@@ -46,6 +47,7 @@ func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, authM
 		chrome:   chrome,
 		sem:      make(chan struct{}, 2),
 		localSem: make(chan struct{}, 1),
+		limiter:  newLocalLimiter(store.DB(), cfg.LocalBuildPerHour, cfg.LocalBuildPerDay, cfg.LocalBuildQueue),
 	}
 }
 

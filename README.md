@@ -55,7 +55,7 @@ serveur*. Ce second choix n'apparaît que si le serveur sait compiler lui-même 
 Android détecté (`ANDROID_HOME`, `ANDROID_SDK_ROOT` ou `~/Library/Android/sdk`) et JDK 17.
 Le serveur copie `android-template/`, applique la même configuration que le workflow,
 lance `./gradlew assembleDebug` (une compilation à la fois, les autres attendent) et
-écrit l'APK dans `releases/`. `LOCAL_BUILD=false` le désactive. Il est **réservé aux comptes connectés** (Google) : sans connexion, l'option est grisée et l'API répond 401. Côté API : champ
+écrit l'APK dans `releases/`. `LOCAL_BUILD=false` le désactive. Il est **réservé aux comptes connectés** (Google) : sans connexion, l'option est grisée et l'API répond 401. Il est aussi **limité** : par compte, `LOCAL_BUILD_PER_HOUR` (5) et `LOCAL_BUILD_PER_DAY` (15) builds sur fenêtre glissante (admins exemptés), un seul build en cours par compte, et une file d'attente globale de `LOCAL_BUILD_QUEUE` (8). Au-delà, l'API répond 429 avec `Retry-After`. Côté API : champ
 `build_method` (`github` | `server`), et `GET /api/build-methods` indique ce qui est
 disponible. Non disponible dans l'image Docker fournie (distroless, sans SDK).
 

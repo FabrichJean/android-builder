@@ -71,7 +71,11 @@ type Config struct {
 	LocalBuild  bool   // build local autorisé
 	AndroidHome string // SDK Android (ANDROID_HOME / ANDROID_SDK_ROOT / ~/Library/Android/sdk)
 	TemplateDir string // projet Android à copier avant chaque build (défaut: android-template)
-	GradleBin   string // commande Gradle ; vide = ./gradlew du template, sinon "gradle" du PATH
+	// Limites du build par le serveur (par compte, fenêtre glissante) et file d'attente globale.
+	LocalBuildPerHour int    // LOCAL_BUILD_PER_HOUR (défaut 5)
+	LocalBuildPerDay  int    // LOCAL_BUILD_PER_DAY (défaut 15)
+	LocalBuildQueue   int    // LOCAL_BUILD_QUEUE : builds en attente max, tous comptes (défaut 8)
+	GradleBin         string // commande Gradle ; vide = ./gradlew du template, sinon "gradle" du PATH
 
 	// Espace admin : emails (Google) autorisés, séparés par des virgules dans
 	// ADMIN_EMAILS. Vide = pas d'admin (les routes /api/admin répondent 403).
@@ -118,6 +122,9 @@ func Load() (*Config, error) {
 	c.AndroidHome = detectAndroidHome()
 	c.TemplateDir = env("TEMPLATE_DIR", "android-template")
 	c.GradleBin = os.Getenv("GRADLE_BIN")
+	c.LocalBuildPerHour = envInt("LOCAL_BUILD_PER_HOUR", 5)
+	c.LocalBuildPerDay = envInt("LOCAL_BUILD_PER_DAY", 15)
+	c.LocalBuildQueue = envInt("LOCAL_BUILD_QUEUE", 8)
 	for _, e := range strings.Split(os.Getenv("ADMIN_EMAILS"), ",") {
 		if e = strings.TrimSpace(e); e != "" {
 			c.AdminEmails = append(c.AdminEmails, e)

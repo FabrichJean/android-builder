@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,6 +51,26 @@ func (s *Server) parseMethod(r *http.Request, v string) (string, error) {
 
 var errLoginRequired = errors.New("connecte-toi avec Google pour compiler par le serveur")
 
+// acquireLocal réserve une place de build local pour l'utilisateur courant,
+// ou répond 429 (avec Retry-After) et renvoie false.
+func (s *Server) acquireLocal(w http.ResponseWriter, r *http.Request) (func(), bool) {
+	u, _ := s.auth.UserFromRequest(r)
+	release, err := s.limiter.Acquire(u.ID, s.cfg.IsAdminEmail(u.Email))
+	if err == nil {
+		return release, true
+	}
+	var le *limitError
+	if errors.As(err, &le) {
+		if le.retryAfter > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(int(le.retryAfter.Seconds())+1))
+		}
+		writeErr(w, http.StatusTooManyRequests, le.msg)
+	} else {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+	}
+	return nil, false
+}
+
 // handleBuildMethods indique à l'interface quelles méthodes de build existent
 // et si l'utilisateur courant a le droit d'utiliser la compilation locale.
 func (s *Server) handleBuildMethods(w http.ResponseWriter, r *http.Request) {
@@ -66,6 +87,7 @@ type localParams struct {
 	ID, AppURL, AppName, Package, VersionName, VersionCode, SplashBg           string
 	HideScrollbar, DebugConsole, FixImages, BackgroundPlayer, PictureInPicture bool
 	Dist, Icon                                                                 []byte // optionnels
+	Release                                                                    func() // libère la place réservée au limiteur (fin du build)
 }
 
 // Étapes affichées dans l'interface (même format que les étapes GitHub).
@@ -75,6 +97,9 @@ var localSteps = []string{"Préparer le projet", "Compiler l'APK (Gradle)", "Ré
 // les suivantes restent "pending" en attendant leur tour.
 func (s *Server) runLocal(p localParams) {
 	log := s.log.With("build_id", p.ID, "method", methodServer)
+	if p.Release != nil {
+		defer p.Release()
+	}
 	s.localSem <- struct{}{}
 	defer func() { <-s.localSem }()
 
