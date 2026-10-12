@@ -64,6 +64,15 @@ type Config struct {
 	ClaudeBin     string // binaire du CLI claude (défaut: "claude" dans le PATH)
 	GenTokenLimit int    // plafond de tokens de sortie pour une génération
 
+	// Build local (alternative à GitHub Actions) : le serveur compile l'APK
+	// lui-même avec le template Android, le SDK Android et un JDK 17.
+	// LOCAL_BUILD=false le désactive ; sinon il est proposé dès que le SDK
+	// Android est détecté.
+	LocalBuild  bool   // build local autorisé
+	AndroidHome string // SDK Android (ANDROID_HOME / ANDROID_SDK_ROOT / ~/Library/Android/sdk)
+	TemplateDir string // projet Android à copier avant chaque build (défaut: android-template)
+	GradleBin   string // commande Gradle ; vide = ./gradlew du template, sinon "gradle" du PATH
+
 	// Espace admin : emails (Google) autorisés, séparés par des virgules dans
 	// ADMIN_EMAILS. Vide = pas d'admin (les routes /api/admin répondent 403).
 	AdminEmails []string
@@ -105,6 +114,10 @@ func Load() (*Config, error) {
 		ClaudeBin:          env("CLAUDE_BIN", "claude"),
 		GenTokenLimit:      envInt("GEN_TOKEN_LIMIT", 10000),
 	}
+	c.LocalBuild = os.Getenv("LOCAL_BUILD") != "false"
+	c.AndroidHome = detectAndroidHome()
+	c.TemplateDir = env("TEMPLATE_DIR", "android-template")
+	c.GradleBin = os.Getenv("GRADLE_BIN")
 	for _, e := range strings.Split(os.Getenv("ADMIN_EMAILS"), ",") {
 		if e = strings.TrimSpace(e); e != "" {
 			c.AdminEmails = append(c.AdminEmails, e)
@@ -133,6 +146,25 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("variables d'environnement manquantes: %v", missing)
 	}
 	return c, nil
+}
+
+// detectAndroidHome cherche le SDK Android (variables d'env puis emplacements usuels).
+func detectAndroidHome() string {
+	cands := []string{os.Getenv("ANDROID_HOME"), os.Getenv("ANDROID_SDK_ROOT")}
+	if home, err := os.UserHomeDir(); err == nil {
+		cands = append(cands,
+			home+"/Library/Android/sdk", // macOS
+			home+"/Android/Sdk")         // Linux
+	}
+	for _, p := range cands {
+		if p == "" {
+			continue
+		}
+		if st, err := os.Stat(p + "/platforms"); err == nil && st.IsDir() {
+			return p
+		}
+	}
+	return ""
 }
 
 func env(key, def string) string {

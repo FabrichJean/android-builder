@@ -27,6 +27,8 @@ type Server struct {
 	log    *slog.Logger
 	chrome string        // binaire Chrome pour les miniatures ("" si absent)
 	sem    chan struct{} // limite les captures Chrome concurrentes
+	// Une seule compilation locale (Gradle) à la fois : gourmand en CPU/RAM.
+	localSem chan struct{}
 }
 
 func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, authMgr *auth.Manager, genMgr *appgen.Manager, log *slog.Logger) *Server {
@@ -41,8 +43,9 @@ func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, authM
 	}
 	return &Server{
 		cfg: cfg, gh: gh, store: store, auth: authMgr, gen: genMgr, users: users, log: log,
-		chrome: chrome,
-		sem:    make(chan struct{}, 2),
+		chrome:   chrome,
+		sem:      make(chan struct{}, 2),
+		localSem: make(chan struct{}, 1),
 	}
 }
 
@@ -50,6 +53,7 @@ func New(cfg *config.Config, gh *ghclient.Client, store *buildstore.Store, authM
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealth)
+	mux.HandleFunc("GET /api/build-methods", s.handleBuildMethods)
 	mux.HandleFunc("POST /api/builds", s.handleCreateBuild)
 	mux.HandleFunc("GET /api/builds/{id}", s.handleGetBuild)
 	mux.HandleFunc("DELETE /api/builds/{id}", s.handleDeleteBuild)

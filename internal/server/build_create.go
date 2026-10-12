@@ -31,6 +31,7 @@ type createRequest struct {
 	FixImages        bool   `json:"fix_images"`
 	BackgroundPlayer bool   `json:"background_player"`
 	PictureInPicture bool   `json:"picture_in_picture"`
+	BuildMethod      string `json:"build_method"` // "github" (défaut) ou "server"
 }
 
 var (
@@ -131,6 +132,11 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "splash_bg invalide (attendu: #RRGGBB)")
 		return
 	}
+	method, err := s.parseMethod(req.BuildMethod)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	id := newID()
 	build := &buildstore.Build{
@@ -145,6 +151,18 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.store.Create(build); err != nil {
 		writeErr(w, http.StatusInternalServerError, "enregistrement du build impossible: "+err.Error())
+		return
+	}
+
+	if method == methodServer {
+		go s.runLocal(localParams{
+			ID: id, AppURL: req.URL, AppName: req.AppName, Package: req.Package,
+			VersionName: req.VersionName, VersionCode: req.VersionCode, SplashBg: splashBg,
+			HideScrollbar: req.HideScrollbar, DebugConsole: req.DebugConsole, FixImages: req.FixImages,
+			BackgroundPlayer: req.BackgroundPlayer, PictureInPicture: req.PictureInPicture,
+		})
+		go s.captureThumb(id, "url", req.URL, nil)
+		writeJSON(w, http.StatusAccepted, map[string]any{"id": id, "status": buildstore.StatusPending})
 		return
 	}
 
@@ -206,6 +224,11 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	fixImages := r.FormValue("fix_images") == "true"
 	backgroundPlayer := r.FormValue("background_player") == "true"
 	pictureInPicture := r.FormValue("picture_in_picture") == "true"
+	method, err := s.parseMethod(r.FormValue("build_method"))
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	if appName == "" {
 		writeErr(w, http.StatusBadRequest, "app_name est obligatoire")
@@ -325,6 +348,23 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.store.Create(build); err != nil {
 		writeErr(w, http.StatusInternalServerError, "enregistrement du build impossible: "+err.Error())
+		return
+	}
+
+	if method == methodServer {
+		go s.runLocal(localParams{
+			ID: id, AppURL: appAssetURL, AppName: appName, Package: pkg,
+			VersionName: vname, VersionCode: vcode, SplashBg: splashBg,
+			HideScrollbar: hideScrollbar, DebugConsole: debugConsole, FixImages: fixImages,
+			BackgroundPlayer: backgroundPlayer, PictureInPicture: pictureInPicture,
+			Dist: distData, Icon: iconData,
+		})
+		if bundle {
+			go s.captureThumb(id, "bundle", "", distData)
+		} else {
+			go s.captureThumb(id, "url", appURL, nil)
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"id": id, "status": buildstore.StatusPending})
 		return
 	}
 
