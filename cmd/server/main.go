@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
@@ -58,6 +59,8 @@ func main() {
 
 	gh := ghclient.New(cfg.Token, cfg.Owner, cfg.Repo, cfg.Workflow)
 	srv := server.New(cfg, gh, store, authMgr, genMgr, log)
+
+	srv.StartHealthChecks(context.Background())
 
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,
