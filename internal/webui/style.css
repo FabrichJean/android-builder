@@ -749,7 +749,6 @@
   .method-badge[hidden] { display: none; }
   .method-badge.off { color: var(--err); border-color: rgba(221,139,120,0.45); background: rgba(221,139,120,0.1); }
   .method-badge.lock { color: var(--warn); border-color: rgba(224,192,125,0.4); }
-  .method-note { margin-top: 8px; font-size: 12.5px; line-height: 1.45; color: var(--err); }
   .seg button.active {
     background: var(--sand-soft); color: var(--sand);
   }

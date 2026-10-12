@@ -38,10 +38,9 @@ function postBuild(fd, onProgress) {
 
 // ---- méthode de build : GitHub Actions (défaut) ou compilation par le serveur ----
 // Le serveur contrôle en continu chaque méthode (voir /api/build-methods) :
-// une méthode en panne est grisée avec un badge « Non disponible » et sa raison.
+// une méthode en panne est grisée avec un badge « Non disponible » .
 let buildMethod = "github";
 const methodBtns = () => [...$("buildMethod").querySelectorAll("button[data-method]")];
-const METHOD_NAMES = { github: "GitHub Actions", server: "Par le serveur" };
 
 function selectMethod(btn) {
   buildMethod = btn.dataset.method;
@@ -57,7 +56,6 @@ $("buildMethod").addEventListener("click", (e) => {
 });
 
 function applyMethods(m) {
-  const notes = [];
   for (const b of methodBtns()) {
     const info = m[b.dataset.method] || { available: true };
     const needsLogin = b.dataset.method === "server" && info.login_required;
@@ -66,15 +64,11 @@ function applyMethods(m) {
     if (!info.available) {
       badge.textContent = "Non disponible";
       badge.classList.add("off");
-      b.title = info.reason || "";
-      if (info.reason) notes.push(`${METHOD_NAMES[b.dataset.method]} : ${info.reason}`);
     } else if (needsLogin) {
       badge.textContent = "Connexion requise";
       badge.classList.add("lock");
-      b.title = "Connecte-toi avec Google pour compiler par le serveur";
     } else {
       badge.textContent = "";
-      b.title = "";
     }
     badge.hidden = !badge.textContent;
     b.disabled = !info.available || needsLogin;
@@ -85,9 +79,6 @@ function applyMethods(m) {
     const alt = methodBtns().find((b) => !b.disabled);
     if (alt) selectMethod(alt);
   }
-  const note = $("methodNote");
-  note.hidden = notes.length === 0;
-  note.textContent = notes.join(" · ");
 }
 
 export function refreshMethods() {
