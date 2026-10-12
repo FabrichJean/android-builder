@@ -36,6 +36,24 @@ function postBuild(fd, onProgress) {
   });
 }
 
+// ---- méthode de build : GitHub Actions (défaut) ou compilation par le serveur ----
+let buildMethod = "github";
+$("buildMethod").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-method]");
+  if (!btn) return;
+  buildMethod = btn.dataset.method;
+  for (const b of $("buildMethod").querySelectorAll("button")) {
+    const on = b === btn;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-checked", String(on));
+  }
+});
+// Le choix n'est proposé que si le serveur peut compiler lui-même.
+fetch("/api/build-methods")
+  .then((r) => r.json())
+  .then((m) => { $("methodSection").hidden = !m.server; })
+  .catch(() => { /* reste sur GitHub Actions */ });
+
 // ---- panneau "Personnaliser" dépliable ----
 $("customToggle").addEventListener("click", (e) => {
   const t = e.currentTarget;
@@ -64,6 +82,7 @@ form.addEventListener("submit", async (e) => {
   if (vname) fd.append("version_name", vname);
   if (vcode) fd.append("version_code", vcode);
   fd.append("splash_bg", splashHex());
+  fd.append("build_method", buildMethod);
   fd.append("hide_scrollbar", $("hideScrollbar").checked ? "true" : "false");
   fd.append("debug_console", $("debugConsole").checked ? "true" : "false");
   fd.append("fix_images", $("fixImages").checked ? "true" : "false");

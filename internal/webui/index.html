@@ -423,6 +423,15 @@
                     />
                   </div>
 
+                  <!-- méthode de build : affichée seulement si le serveur sait compiler lui-même -->
+                  <div class="section" id="methodSection" hidden>
+                    <div class="section-label">Méthode de build</div>
+                    <div class="seg" id="buildMethod" role="radiogroup" aria-label="Méthode de build">
+                      <button type="button" role="radio" class="active" aria-checked="true" data-method="github">GitHub Actions</button>
+                      <button type="button" role="radio" aria-checked="false" data-method="server">Par le serveur</button>
+                    </div>
+                  </div>
+
                   <!-- personnalisation dépliable -->
                   <div class="section">
                     <div class="section-label">

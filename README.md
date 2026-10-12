@@ -48,6 +48,17 @@ Copier `.env.example` puis renseigner les variables :
 | `GOOGLE_LOGIN_CLIENT_ID` / `GOOGLE_LOGIN_CLIENT_SECRET` | Connexion Google (optionnelle, voir ci-dessous) | — |
 | `SESSION_SECRET`  | Signe les cookies de session (auto-généré si absent) | — |
 
+### Build par le serveur (optionnel)
+
+Le formulaire propose une **méthode de build** : *GitHub Actions* (défaut) ou *Par le
+serveur*. Ce second choix n'apparaît que si le serveur sait compiler lui-même : SDK
+Android détecté (`ANDROID_HOME`, `ANDROID_SDK_ROOT` ou `~/Library/Android/sdk`) et JDK 17.
+Le serveur copie `android-template/`, applique la même configuration que le workflow,
+lance `./gradlew assembleDebug` (une compilation à la fois, les autres attendent) et
+écrit l'APK dans `releases/`. `LOCAL_BUILD=false` le désactive. Côté API : champ
+`build_method` (`github` | `server`), et `GET /api/build-methods` indique ce qui est
+disponible. Non disponible dans l'image Docker fournie (distroless, sans SDK).
+
 ### Connexion Google (optionnelle) — historique de builds privé
 
 Sans configuration, l'app fonctionne comme avant : chaque navigateur garde son propre
