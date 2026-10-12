@@ -738,6 +738,8 @@
     transition: background .15s, color .15s;
   }
   .seg button:hover { color: var(--text); }
+  .seg button:disabled { opacity: .45; cursor: not-allowed; }
+  .seg button:disabled:hover { color: var(--muted); }
   .seg button.active {
     background: var(--sand-soft); color: var(--sand);
   }

@@ -51,7 +51,13 @@ $("buildMethod").addEventListener("click", (e) => {
 // Le choix n'est proposé que si le serveur peut compiler lui-même.
 fetch("/api/build-methods")
   .then((r) => r.json())
-  .then((m) => { $("methodSection").hidden = !m.server; })
+  .then((m) => {
+    $("methodSection").hidden = !m.server;
+    // Réservé aux comptes connectés : l'option reste visible mais grisée.
+    const srv = $("buildMethod").querySelector('[data-method="server"]');
+    srv.disabled = !!m.server_login;
+    srv.title = m.server_login ? "Connecte-toi avec Google pour compiler par le serveur" : "";
+  })
   .catch(() => { /* reste sur GitHub Actions */ });
 
 // ---- panneau "Personnaliser" dépliable ----

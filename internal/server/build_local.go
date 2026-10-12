@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -29,7 +30,9 @@ func (s *Server) localBuildAvailable() bool {
 }
 
 // parseMethod normalise le champ build_method (vide = GitHub Actions).
-func (s *Server) parseMethod(v string) (string, error) {
+// Le build par le serveur consomme du CPU/RAM locaux : il est réservé aux
+// comptes connectés (les builds GitHub Actions restent ouverts à tous).
+func (s *Server) parseMethod(r *http.Request, v string) (string, error) {
 	switch strings.TrimSpace(v) {
 	case "", methodGitHub:
 		return methodGitHub, nil
@@ -37,16 +40,23 @@ func (s *Server) parseMethod(v string) (string, error) {
 		if !s.localBuildAvailable() {
 			return "", fmt.Errorf("le build par le serveur n'est pas disponible (SDK Android introuvable ou LOCAL_BUILD=false)")
 		}
+		if s.currentUserID(r) == "" {
+			return "", errLoginRequired
+		}
 		return methodServer, nil
 	}
 	return "", fmt.Errorf("build_method invalide (attendu: %q ou %q)", methodGitHub, methodServer)
 }
 
-// handleBuildMethods indique à l'interface quelles méthodes de build existent.
+var errLoginRequired = errors.New("connecte-toi avec Google pour compiler par le serveur")
+
+// handleBuildMethods indique à l'interface quelles méthodes de build existent
+// et si l'utilisateur courant a le droit d'utiliser la compilation locale.
 func (s *Server) handleBuildMethods(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"github": true,
-		"server": s.localBuildAvailable(),
+		"github":       true,
+		"server":       s.localBuildAvailable(),
+		"server_login": s.localBuildAvailable() && s.currentUserID(r) == "",
 	})
 }
 

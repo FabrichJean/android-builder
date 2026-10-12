@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -132,9 +133,9 @@ func (s *Server) createURLBuild(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "splash_bg invalide (attendu: #RRGGBB)")
 		return
 	}
-	method, err := s.parseMethod(req.BuildMethod)
+	method, err := s.parseMethod(r, req.BuildMethod)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
+		writeErr(w, methodErrStatus(err), err.Error())
 		return
 	}
 
@@ -224,9 +225,9 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 	fixImages := r.FormValue("fix_images") == "true"
 	backgroundPlayer := r.FormValue("background_player") == "true"
 	pictureInPicture := r.FormValue("picture_in_picture") == "true"
-	method, err := s.parseMethod(r.FormValue("build_method"))
+	method, err := s.parseMethod(r, r.FormValue("build_method"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
+		writeErr(w, methodErrStatus(err), err.Error())
 		return
 	}
 
@@ -431,6 +432,14 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 		"id":     id,
 		"status": buildstore.StatusPending,
 	})
+}
+
+// methodErrStatus : 401 si la connexion manque, 400 sinon.
+func methodErrStatus(err error) int {
+	if errors.Is(err, errLoginRequired) {
+		return http.StatusUnauthorized
+	}
+	return http.StatusBadRequest
 }
 
 func boolStr(b bool) string {
