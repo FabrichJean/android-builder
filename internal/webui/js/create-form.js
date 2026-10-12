@@ -37,28 +37,68 @@ function postBuild(fd, onProgress) {
 }
 
 // ---- méthode de build : GitHub Actions (défaut) ou compilation par le serveur ----
+// Le serveur contrôle en continu chaque méthode (voir /api/build-methods) :
+// une méthode en panne est grisée avec un badge « Non disponible » et sa raison.
 let buildMethod = "github";
-$("buildMethod").addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-method]");
-  if (!btn) return;
+const methodBtns = () => [...$("buildMethod").querySelectorAll("button[data-method]")];
+const METHOD_NAMES = { github: "GitHub Actions", server: "Par le serveur" };
+
+function selectMethod(btn) {
   buildMethod = btn.dataset.method;
-  for (const b of $("buildMethod").querySelectorAll("button")) {
+  for (const b of methodBtns()) {
     const on = b === btn;
     b.classList.toggle("active", on);
     b.setAttribute("aria-checked", String(on));
   }
+}
+$("buildMethod").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-method]");
+  if (btn && !btn.disabled) selectMethod(btn);
 });
-// Le choix n'est proposé que si le serveur peut compiler lui-même.
-fetch("/api/build-methods")
-  .then((r) => r.json())
-  .then((m) => {
-    $("methodSection").hidden = !m.server;
-    // Réservé aux comptes connectés : l'option reste visible mais grisée.
-    const srv = $("buildMethod").querySelector('[data-method="server"]');
-    srv.disabled = !!m.server_login;
-    srv.title = m.server_login ? "Connecte-toi avec Google pour compiler par le serveur" : "";
-  })
-  .catch(() => { /* reste sur GitHub Actions */ });
+
+function applyMethods(m) {
+  const notes = [];
+  for (const b of methodBtns()) {
+    const info = m[b.dataset.method] || { available: true };
+    const needsLogin = b.dataset.method === "server" && info.login_required;
+    const badge = b.querySelector(".method-badge");
+    badge.classList.remove("off", "lock");
+    if (!info.available) {
+      badge.textContent = "Non disponible";
+      badge.classList.add("off");
+      b.title = info.reason || "";
+      if (info.reason) notes.push(`${METHOD_NAMES[b.dataset.method]} : ${info.reason}`);
+    } else if (needsLogin) {
+      badge.textContent = "Connexion requise";
+      badge.classList.add("lock");
+      b.title = "Connecte-toi avec Google pour compiler par le serveur";
+    } else {
+      badge.textContent = "";
+      b.title = "";
+    }
+    badge.hidden = !badge.textContent;
+    b.disabled = !info.available || needsLogin;
+  }
+  // La méthode choisie est devenue inutilisable : bascule sur une autre disponible.
+  const current = methodBtns().find((b) => b.dataset.method === buildMethod);
+  if (current && current.disabled) {
+    const alt = methodBtns().find((b) => !b.disabled);
+    if (alt) selectMethod(alt);
+  }
+  const note = $("methodNote");
+  note.hidden = notes.length === 0;
+  note.textContent = notes.join(" · ");
+}
+
+export function refreshMethods() {
+  return fetch("/api/build-methods")
+    .then((r) => r.json())
+    .then(applyMethods)
+    .catch(() => { /* garde l'affichage précédent */ });
+}
+refreshMethods();
+setInterval(refreshMethods, 60_000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshMethods(); });
 
 // ---- panneau "Personnaliser" dépliable ----
 $("customToggle").addEventListener("click", (e) => {
@@ -147,6 +187,7 @@ form.addEventListener("submit", async (e) => {
   } catch (err) {
     if (entry) { removeBuildById(entry.id); entry = null; render(); }
     fail(err.message);
+    refreshMethods(); // un refus 503/429 vient souvent d'un changement d'état
   } finally {
     submit.disabled = false;
   }
