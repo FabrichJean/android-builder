@@ -74,6 +74,18 @@ func (s *Server) watch(id, runName string, dispatchedAt time.Time, cleanup func(
 	}
 
 	if run.Conclusion != "success" {
+		// Job jamais démarré (compte verrouillé, facturation…) : le dire clairement
+		// plutôt qu'un « conclusion: failure » opaque, et couper la méthode tout
+		// de suite (badge « Non disponible ») au lieu d'attendre le prochain contrôle.
+		if reason := s.gh.FailureReason(ctx, run.ID, run.Conclusion); reason != "" {
+			if ghclient.IsBillingFailure(reason) {
+				s.health.set(methodGitHub, false, "GitHub refuse de démarrer les builds : "+reason)
+				s.fail(id, "GitHub Actions n'a pas pu démarrer le build : le compte GitHub est bloqué pour un problème de facturation ("+reason+"). Utilise « Par le serveur » en attendant.")
+			} else {
+				s.fail(id, "GitHub Actions n'a pas pu démarrer le build : "+reason+", voir "+run.HTMLURL)
+			}
+			return
+		}
 		s.fail(id, "build en échec (conclusion: "+run.Conclusion+"), voir "+run.HTMLURL)
 		return
 	}
