@@ -20,6 +20,7 @@ type fakeGH struct {
 	wfState       string
 	billing       map[string]any // nil = 404
 	runs          []fakeRun
+	annotation    string // message d'annotation « failure » des jobs morts au démarrage
 }
 
 type fakeRun struct {
@@ -63,7 +64,14 @@ func (f *fakeGH) server(t *testing.T) *Client {
 		for i := range steps {
 			steps[i] = map[string]any{"name": "x"}
 		}
-		j(w, 200, map[string]any{"jobs": []any{map[string]any{"steps": steps}}})
+		j(w, 200, map[string]any{"jobs": []any{map[string]any{"id": 5000 + id, "steps": steps}}})
+	})
+	mux.HandleFunc("/repos/o/r/check-runs/", func(w http.ResponseWriter, r *http.Request) {
+		anns := []any{map[string]any{"annotation_level": "notice", "message": "ubuntu-latest migre vers Ubuntu 26"}}
+		if f.annotation != "" {
+			anns = append(anns, map[string]any{"annotation_level": "failure", "message": f.annotation})
+		}
+		j(w, 200, anns)
 	})
 	mux.HandleFunc("/users/o/settings/billing/actions", func(w http.ResponseWriter, r *http.Request) {
 		if f.billing == nil {
@@ -111,6 +119,15 @@ func TestCheckHealth(t *testing.T) {
 		{"startup_failure x2", func(f *fakeGH) {
 			f.runs = []fakeRun{{conclusion: "startup_failure", age: time.Hour}, {conclusion: "startup_failure", age: time.Hour}}
 		}, false, "avant de démarrer"},
+		{"compte verrouillé : 1 seul run récent suffit", func(f *fakeGH) {
+			f.annotation = "The job was not started because your account is locked due to a billing issue."
+			f.runs = []fakeRun{startDead, {conclusion: "success", age: 2 * time.Hour}}
+		}, false, "locked due to a billing issue"},
+		{"compte verrouillé mais run vieux de 5 h : on réessaie", func(f *fakeGH) {
+			f.annotation = "The job was not started because your account is locked due to a billing issue."
+			f.runs = []fakeRun{{conclusion: "failure", age: 5 * time.Hour}, {conclusion: "success", age: 6 * time.Hour}}
+		}, true, ""},
+		{"1 seul run mort sans motif de facturation", func(f *fakeGH) { f.runs = []fakeRun{startDead, {conclusion: "success", age: time.Hour}} }, true, ""},
 		{"1 seul run mort + 1 ok", func(f *fakeGH) { f.runs = []fakeRun{startDead, {conclusion: "success", age: time.Hour}} }, true, ""},
 		{"échec normal (étapes exécutées)", func(f *fakeGH) {
 			f.runs = []fakeRun{{conclusion: "failure", age: time.Hour, steps: 5}, {conclusion: "failure", age: time.Hour, steps: 5}}
@@ -139,5 +156,23 @@ func TestCheckHealthUnreachable(t *testing.T) {
 	c.baseURL = "http://127.0.0.1:1"
 	if h := c.CheckHealth(context.Background(), "main"); h.OK || !strings.Contains(h.Reason, "injoignable") {
 		t.Fatalf("attendu injoignable, obtenu %+v", h)
+	}
+}
+
+func TestFailureReason(t *testing.T) {
+	f := okGH()
+	f.annotation = "The job was not started because your account is locked due to a billing issue."
+	f.runs = []fakeRun{{conclusion: "failure", age: time.Minute, steps: 0}, {conclusion: "failure", age: time.Minute, steps: 7}}
+	c := f.server(t)
+
+	reason := c.FailureReason(context.Background(), 1, "failure")
+	if !strings.Contains(reason, "billing issue") || !IsBillingFailure(reason) {
+		t.Fatalf("raison inattendue: %q", reason)
+	}
+	if r := c.FailureReason(context.Background(), 2, "failure"); r != "" {
+		t.Fatalf("un run qui a exécuté des étapes n'a pas de raison de démarrage, obtenu %q", r)
+	}
+	if IsBillingFailure("npm ERR!") {
+		t.Fatal("faux positif facturation")
 	}
 }

@@ -19,7 +19,6 @@ import (
 const (
 	serverHealthEvery = time.Minute     // contrôles locaux : bon marché
 	githubHealthEvery = 5 * time.Minute // appels API GitHub : plus espacés
-	minFreeDisk       = 2 << 30         // 2 Go : Gradle + copie du template + APK
 	requiredPlatform  = "android-34"    // compileSdk du template
 )
 
@@ -100,6 +99,9 @@ func (s *Server) methodUnavailable(method string) (string, bool) {
 	h := s.health.get(method)
 	return h.Reason, !h.Available
 }
+
+// minFreeDisk : Gradle + copie du template + APK (variable pour les tests).
+var minFreeDisk uint64 = 2 << 30
 
 var javaMajorRe = regexp.MustCompile(`version "(\d+)`)
 

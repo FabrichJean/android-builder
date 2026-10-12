@@ -15,6 +15,9 @@ import (
 // minimaux dans un dossier temporaire, et renvoie un Server configuré dessus.
 func fakeEnv(t *testing.T, javaVersion string) *Server {
 	t.Helper()
+	old := minFreeDisk
+	minFreeDisk = 0 // le test ne doit pas dépendre de l'espace disque réel de la machine
+	t.Cleanup(func() { minFreeDisk = old })
 	root := t.TempDir()
 	mk := func(p string) { os.MkdirAll(filepath.Join(root, p), 0o755) }
 	mk("sdk/platforms/" + requiredPlatform)
@@ -74,6 +77,15 @@ func TestCheckServerBuild(t *testing.T) {
 				t.Fatalf("ok=%v raison=%q, attendu une raison contenant %q", ok, reason, tc.want)
 			}
 		})
+	}
+}
+
+func TestCheckServerBuildLowDisk(t *testing.T) {
+	s := fakeEnv(t, "17.0.1")
+	minFreeDisk = ^uint64(0) // exige « tout l'espace » : forcément insuffisant
+	ok, reason := s.checkServerBuild()
+	if ok || !strings.Contains(reason, "espace disque insuffisant") {
+		t.Fatalf("ok=%v raison=%q", ok, reason)
 	}
 }
 

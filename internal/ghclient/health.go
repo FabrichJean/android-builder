@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	neturl "net/url"
+	"regexp"
 	"time"
 )
 
@@ -19,6 +20,7 @@ const (
 	minRateLimitRemaining = 100           // en dessous, le suivi des builds (polling) risque d'échouer
 	startFailureWindow    = 6 * time.Hour // runs récents considérés pour détecter un blocage de facturation
 	startFailureThreshold = 2             // nb de runs consécutifs « morts au démarrage » avant de déclarer indisponible
+	billingFailureWindow  = 3 * time.Hour // un seul run « facturation » récent suffit à bloquer
 )
 
 func (c *Client) api() string {
@@ -141,10 +143,17 @@ func (c *Client) CheckHealth(ctx context.Context, ref string) Health {
 	return Health{OK: true}
 }
 
+// billingRe reconnaît les annotations GitHub d'un job refusé pour cause de
+// facturation / limite de dépense : un seul run suffit alors à conclure.
+var billingRe = regexp.MustCompile(`(?i)billing|spending limit|payments have failed|account is locked`)
+
 // recentStartFailures détecte les derniers runs terminés en échec SANS avoir
 // exécuté la moindre étape : c'est la signature d'un compte bloqué (paiement
-// échoué, limite de dépense atteinte). Un seul run ne suffit pas ; ils doivent
-// être consécutifs et récents, ce qui laisse le statut se rétablir de lui-même.
+// échoué, compte verrouillé, limite de dépense atteinte).
+//   - un run dont l'annotation parle de facturation suffit, s'il date de moins
+//     de billingFailureWindow : sans nouveau build, rien d'autre ne peut le
+//     « guérir », d'où cette fenêtre courte (le prochain essai refait le test) ;
+//   - sinon, il faut startFailureThreshold runs consécutifs, dans startFailureWindow.
 func (c *Client) recentStartFailures(ctx context.Context, repoPath string) Health {
 	var runs struct {
 		Runs []struct {
@@ -154,34 +163,90 @@ func (c *Client) recentStartFailures(ctx context.Context, repoPath string) Healt
 		} `json:"workflow_runs"`
 	}
 	path := fmt.Sprintf("%s/actions/workflows/%s/runs?status=completed&per_page=%d", repoPath, neturl.PathEscape(c.workflow), startFailureThreshold)
-	if code, _, err := c.getJSON(ctx, path, &runs); err != nil || code != http.StatusOK || len(runs.Runs) < startFailureThreshold {
+	if code, _, err := c.getJSON(ctx, path, &runs); err != nil || code != http.StatusOK || len(runs.Runs) == 0 {
 		return Health{OK: true}
 	}
-	for _, r := range runs.Runs {
-		if time.Since(r.CreatedAt) > startFailureWindow {
-			return Health{OK: true}
+	consecutive := 0
+	for i, r := range runs.Runs {
+		age := time.Since(r.CreatedAt)
+		if age > startFailureWindow {
+			break
 		}
-		started := r.Conclusion == "startup_failure"
-		if !started && r.Conclusion == "failure" {
-			var jobs struct {
-				Jobs []struct {
-					Steps []json.RawMessage `json:"steps"`
-				} `json:"jobs"`
-			}
-			code, _, err := c.getJSON(ctx, fmt.Sprintf("%s/actions/runs/%d/jobs", repoPath, r.ID), &jobs)
-			if err != nil || code != http.StatusOK || len(jobs.Jobs) == 0 {
-				return Health{OK: true}
-			}
-			started = true
-			for _, j := range jobs.Jobs {
-				if len(j.Steps) > 0 {
-					started = false
-				}
-			}
+		dead, reason := c.startFailure(ctx, repoPath, r.ID, r.Conclusion)
+		if !dead {
+			break
 		}
-		if !started {
-			return Health{OK: true}
+		if i == 0 && age <= billingFailureWindow && billingRe.MatchString(reason) {
+			return Health{Reason: "GitHub refuse de démarrer les builds : " + reason}
+		}
+		consecutive++
+	}
+	if consecutive >= startFailureThreshold {
+		return Health{Reason: fmt.Sprintf("les %d derniers builds GitHub ont échoué avant de démarrer (facturation, limite de dépense ou quota Actions ?)", startFailureThreshold)}
+	}
+	return Health{OK: true}
+}
+
+// startFailure indique si le run est mort avant d'exécuter une seule étape, et
+// renvoie le message d'annotation de GitHub expliquant pourquoi (s'il existe).
+func (c *Client) startFailure(ctx context.Context, repoPath string, runID int64, conclusion string) (bool, string) {
+	if conclusion != "startup_failure" && conclusion != "failure" {
+		return false, ""
+	}
+	var jobs struct {
+		Jobs []struct {
+			ID    int64             `json:"id"`
+			Steps []json.RawMessage `json:"steps"`
+		} `json:"jobs"`
+	}
+	if code, _, err := c.getJSON(ctx, fmt.Sprintf("%s/actions/runs/%d/jobs", repoPath, runID), &jobs); err != nil || code != http.StatusOK {
+		return false, ""
+	}
+	if len(jobs.Jobs) == 0 {
+		return conclusion == "startup_failure", ""
+	}
+	reason := ""
+	for _, j := range jobs.Jobs {
+		if len(j.Steps) > 0 {
+			return false, ""
+		}
+		if reason == "" {
+			reason = c.failureAnnotation(ctx, repoPath, j.ID)
 		}
 	}
-	return Health{Reason: fmt.Sprintf("les %d derniers builds GitHub ont échoué avant de démarrer (facturation, limite de dépense ou quota Actions ?)", startFailureThreshold)}
+	return true, reason
 }
+
+// failureAnnotation renvoie le message d'erreur (annotation « failure ») d'un job.
+func (c *Client) failureAnnotation(ctx context.Context, repoPath string, jobID int64) string {
+	var anns []struct {
+		Level   string `json:"annotation_level"`
+		Message string `json:"message"`
+	}
+	if code, _, err := c.getJSON(ctx, fmt.Sprintf("%s/check-runs/%d/annotations", repoPath, jobID), &anns); err != nil || code != http.StatusOK {
+		return ""
+	}
+	for _, a := range anns {
+		if a.Level == "failure" {
+			return a.Message
+		}
+	}
+	return ""
+}
+
+// FailureReason explique l'échec d'un run quand GitHub n'a exécuté aucune
+// étape (compte verrouillé, facturation…). Chaîne vide si le run a démarré
+// normalement : l'échec est alors dans les journaux du job.
+func (c *Client) FailureReason(ctx context.Context, runID int64, conclusion string) string {
+	repoPath := fmt.Sprintf("/repos/%s/%s", c.owner, c.repo)
+	if dead, reason := c.startFailure(ctx, repoPath, runID, conclusion); dead {
+		if reason == "" {
+			reason = "le job n'a pas démarré"
+		}
+		return reason
+	}
+	return ""
+}
+
+// IsBillingFailure indique si une raison d'échec relève de la facturation.
+func IsBillingFailure(reason string) bool { return billingRe.MatchString(reason) }
