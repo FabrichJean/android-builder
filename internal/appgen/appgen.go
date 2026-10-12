@@ -13,7 +13,6 @@
 package appgen
 
 import (
-	"archive/zip"
 	"bufio"
 	"bytes"
 	"context"
@@ -175,7 +174,7 @@ func (m *Manager) Prepare(ctx context.Context, userID, desc string) (*Session, e
 		return nil, fmt.Errorf("description trop longue (max %d caractères) — plus c'est court, moins ça consomme", maxDescLen)
 	}
 
-	prompt := fmt.Sprintf(`Tu prépares la génération d'une mini web app (un seul fichier index.html, CSS/JS inline) à partir d'une description utilisateur.
+	prompt := fmt.Sprintf(`Tu prépares la génération d'une mini web app (un petit projet statique structuré : index.html, css/, js/) à partir d'une description utilisateur.
 Réponds UNIQUEMENT avec un objet JSON, sans markdown ni texte autour, de la forme exacte :
 {"safe":true|false,"reason":"...","app_name":"...","questions":[{"id":"q1","label":"...","options":["...","..."]}],"estimated_tokens":N,"lighter_description":"..."}
 
@@ -348,7 +347,7 @@ func (m *Manager) generate(ctx context.Context, id, userID, desc string, questio
 	onProgress := func(used int) {
 		m.update(id, func(s *Session) { s.TokensUsed = used })
 	}
-	html, used, err := m.runStreamed(ctx, prompt, limit, onProgress)
+	out, used, err := m.runStreamed(ctx, prompt, limit, onProgress)
 	// Les tokens consommés ont un coût réel quel que soit le résultat final
 	// (succès, budget dépassé, échec) : ils sont décomptés des crédits du
 	// jour dans tous les cas.
@@ -370,16 +369,16 @@ func (m *Manager) generate(ctx context.Context, id, userID, desc string, questio
 		return
 	}
 
-	doc, ok := extractHTML(html)
-	if !ok {
+	files, perr := parseProject(out)
+	if perr != nil {
 		m.update(id, func(s *Session) {
 			s.Status = StatusFailed
 			s.TokensUsed = used
-			s.Error = "la sortie générée n'est pas un document HTML complet"
+			s.Error = perr.Error()
 		})
 		return
 	}
-	zipped, err := zipIndexHTML(doc)
+	zipped, err := zipFiles(files)
 	if err != nil {
 		m.update(id, func(s *Session) { s.Status = StatusFailed; s.Error = "empaquetage impossible: " + err.Error() })
 		return
@@ -389,7 +388,7 @@ func (m *Manager) generate(ctx context.Context, id, userID, desc string, questio
 		s.TokensUsed = used
 		s.zip = zipped
 	})
-	m.log.Info("app générée", "session", id, "tokens", used, "taille", len(doc))
+	m.log.Info("app générée", "session", id, "tokens", used, "fichiers", len(files), "taille", len(zipped))
 }
 
 // streamEvent couvre les lignes utiles de `--output-format stream-json`.
@@ -560,23 +559,6 @@ func extractHTML(out string) (string, bool) {
 		return "", false
 	}
 	return out[start : end+len("</html>")], true
-}
-
-// zipIndexHTML fabrique en mémoire un dist.zip contenant le seul index.html.
-func zipIndexHTML(html string) ([]byte, error) {
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	f, err := zw.Create("index.html")
-	if err != nil {
-		return nil, err
-	}
-	if _, err := f.Write([]byte(html)); err != nil {
-		return nil, err
-	}
-	if err := zw.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func firstLine(s string) string {
