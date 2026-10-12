@@ -77,11 +77,28 @@ func buildPrompt(desc string, questions []Question, answers map[string]string) s
 	if prefs == "" {
 		prefs = "(aucune précision supplémentaire)\n"
 	}
-	return fmt.Sprintf(`Génère une mini web app en UN SEUL fichier index.html complet (CSS et JS inline), sans aucune dépendance externe (pas de CDN, pas de police distante), en français.
-Contraintes STRICTES :
-- Réponds UNIQUEMENT avec le document HTML : la réponse commence par <!doctype html> et se termine par </html>. Aucun texte avant ou après, pas de bloc markdown.
-- Code compact : vise le minimum de tokens tout en restant lisible. Pas de commentaires superflus.
-- Adaptée mobile (meta viewport), utilisable hors-ligne.
+	return fmt.Sprintf(`Tu es un développeur front-end senior. Génère une mini web app sous forme de PROJET STATIQUE BIEN STRUCTURÉ, en français, sans aucune dépendance externe (pas de CDN, pas de police distante, pas de build), utilisable hors-ligne dans une WebView Android.
+
+FORMAT DE SORTIE (strict) :
+- Chaque fichier est précédé d'une ligne exacte "=== FILE: chemin/du/fichier ===", suivie directement de son contenu. Aucun autre texte avant, entre ou après, aucun bloc markdown.
+- Chemins relatifs en minuscules (lettres, chiffres, - _ .), extensions autorisées : html, css, js, json, svg. 12 fichiers maximum.
+- Le premier fichier est index.html (document complet commençant par <!doctype html>).
+
+STRUCTURE DU PROJET (adapte le nombre de fichiers à la taille de l'app : 3 pour une petite, 5 à 7 pour une app riche) :
+- index.html : uniquement le balisage sémantique (header/main/nav/section…), <meta viewport>, <link rel="stylesheet" href="css/style.css"> et <script type="module" src="js/main.js"></script>. Pas de CSS ni de JS inline.
+- css/style.css : variables CSS (:root) pour couleurs/espacements/rayons, approche mobile-first, sections commentées (base, layout, composants). Respecte env(safe-area-inset-*), cibles tactiles ≥ 44px, contrastes lisibles, prefers-color-scheme si pertinent.
+- js/main.js : point d'entrée qui initialise l'app et branche les événements, rien d'autre.
+- js/state.js (ou data.js) : l'état de l'app et sa logique métier PURE (aucun accès au DOM).
+- js/storage.js : persistance localStorage (clé versionnée, try/catch, valeurs par défaut) si l'app doit garder des données.
+- js/ui.js (ou views.js) : rendu et manipulation du DOM à partir de l'état.
+- Ajoute d'autres modules (ex. js/utils.js, js/game.js) seulement s'ils ont une responsabilité claire.
+
+RÈGLES DE QUALITÉ DU CODE :
+- JavaScript ES modules (import/export), const/let, jamais var ; une responsabilité par fichier et par fonction ; fonctions courtes aux noms explicites ; constantes nommées plutôt que valeurs magiques.
+- Sépare l'état, la logique et le rendu : une source de vérité unique, une fonction render(état) ; délégation d'événements plutôt que des écouteurs en cascade.
+- Jamais d'innerHTML avec du texte saisi par l'utilisateur (utilise textContent / createElement) ; valide les entrées ; gère les cas vides et les erreurs sans planter.
+- Accessibilité : éléments natifs (button, label, etc.), aria-label sur les boutons-icônes, focus visible.
+- Code compact (le budget de tokens est limité) mais lisible : une ligne d'en-tête en commentaire par fichier et de brefs commentaires de section, pas de commentaires superflus.
 
 Description de l'app :
 %s
