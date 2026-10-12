@@ -104,6 +104,13 @@ func (l *localLimiter) Acquire(userID string, exempt bool) (release func(), err 
 	}, nil
 }
 
+// Full indique si la file d'attente globale est saturée.
+func (l *localLimiter) Full() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.queued >= l.maxQueue
+}
+
 func humanDuration(d time.Duration) string {
 	d = d.Round(time.Minute)
 	if d < time.Minute {

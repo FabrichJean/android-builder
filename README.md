@@ -59,6 +59,22 @@ lance `./gradlew assembleDebug` (une compilation à la fois, les autres attenden
 `build_method` (`github` | `server`), et `GET /api/build-methods` indique ce qui est
 disponible. Non disponible dans l'image Docker fournie (distroless, sans SDK).
 
+### Disponibilité des méthodes de build (contrôle automatique)
+
+Le serveur contrôle en arrière-plan que chaque méthode peut réussir, et le formulaire
+affiche un badge **Non disponible** (avec la raison) sur celle qui est en panne. Un build
+demandé sur une méthode en panne est refusé d'emblée (HTTP 503) au lieu d'échouer plus tard.
+`GET /api/build-methods` renvoie l'état de chacune (`available`, `reason`, `checked_at`).
+
+- **GitHub Actions** (toutes les 5 min) : token valide, dépôt non archivé et accessible,
+  branche et workflow présents et actifs, quota de l'API GitHub, minutes Actions non
+  épuisées (dépôts privés, si l'API de facturation répond) et absence de runs récents
+  morts avant démarrage (signature d'un paiement échoué ou d'une limite de dépense atteinte).
+- **Par le serveur** (toutes les minutes) : option activée, SDK Android complet, JDK 17 à 21,
+  template et `gradlew` présents, ≥ 2 Go libres sur le disque, file d'attente non saturée.
+
+Tant qu'aucun contrôle n'a abouti, les méthodes restent disponibles (on ne bloque pas sans information).
+
 ### Connexion Google (optionnelle) — historique de builds privé
 
 Sans configuration, l'app fonctionne comme avant : chaque navigateur garde son propre

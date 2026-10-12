@@ -24,6 +24,7 @@ type Client struct {
 	owner    string
 	repo     string
 	workflow string
+	baseURL  string // surcharge de apiBase (tests) ; vide = API publique GitHub
 }
 
 // New construit un client pour owner/repo.

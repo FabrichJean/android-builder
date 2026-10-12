@@ -459,8 +459,12 @@ func (s *Server) createBundleBuild(w http.ResponseWriter, r *http.Request) {
 
 // methodErrStatus : 401 si la connexion manque, 400 sinon.
 func methodErrStatus(err error) int {
-	if errors.Is(err, errLoginRequired) {
+	var ue *unavailableError
+	switch {
+	case errors.Is(err, errLoginRequired):
 		return http.StatusUnauthorized
+	case errors.As(err, &ue):
+		return http.StatusServiceUnavailable
 	}
 	return http.StatusBadRequest
 }

@@ -25,28 +25,37 @@ const (
 	methodServer = "server" // compilation locale par ce serveur
 )
 
-// localBuildAvailable indique si le serveur peut compiler lui-même un APK.
-func (s *Server) localBuildAvailable() bool {
-	return s.cfg.LocalBuild && s.cfg.AndroidHome != ""
-}
-
-// parseMethod normalise le champ build_method (vide = GitHub Actions).
+// parseMethod normalise le champ build_method (vide = GitHub Actions) et
+// refuse une méthode actuellement indisponible (voir health.go).
 // Le build par le serveur consomme du CPU/RAM locaux : il est réservé aux
 // comptes connectés (les builds GitHub Actions restent ouverts à tous).
 func (s *Server) parseMethod(r *http.Request, v string) (string, error) {
-	switch strings.TrimSpace(v) {
-	case "", methodGitHub:
-		return methodGitHub, nil
-	case methodServer:
-		if !s.localBuildAvailable() {
-			return "", fmt.Errorf("le build par le serveur n'est pas disponible (SDK Android introuvable ou LOCAL_BUILD=false)")
-		}
-		if s.currentUserID(r) == "" {
-			return "", errLoginRequired
-		}
-		return methodServer, nil
+	method := strings.TrimSpace(v)
+	switch method {
+	case "":
+		method = methodGitHub
+	case methodGitHub, methodServer:
+	default:
+		return "", fmt.Errorf("build_method invalide (attendu: %q ou %q)", methodGitHub, methodServer)
 	}
-	return "", fmt.Errorf("build_method invalide (attendu: %q ou %q)", methodGitHub, methodServer)
+	if reason, down := s.methodUnavailable(method); down {
+		return "", &unavailableError{method: method, reason: reason}
+	}
+	if method == methodServer && s.currentUserID(r) == "" {
+		return "", errLoginRequired
+	}
+	return method, nil
+}
+
+// unavailableError : la méthode de build demandée est en panne (HTTP 503).
+type unavailableError struct{ method, reason string }
+
+func (e *unavailableError) Error() string {
+	name := "GitHub Actions"
+	if e.method == methodServer {
+		name = "le build par le serveur"
+	}
+	return fmt.Sprintf("%s n'est pas disponible actuellement : %s", name, e.reason)
 }
 
 var errLoginRequired = errors.New("connecte-toi avec Google pour compiler par le serveur")
@@ -71,13 +80,18 @@ func (s *Server) acquireLocal(w http.ResponseWriter, r *http.Request) (func(), b
 	return nil, false
 }
 
-// handleBuildMethods indique à l'interface quelles méthodes de build existent
-// et si l'utilisateur courant a le droit d'utiliser la compilation locale.
+// handleBuildMethods indique à l'interface l'état de chaque méthode de build
+// (badge « Non disponible » + raison) et si la connexion est requise.
 func (s *Server) handleBuildMethods(w http.ResponseWriter, r *http.Request) {
+	srv := s.health.get(methodServer)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"github":       true,
-		"server":       s.localBuildAvailable(),
-		"server_login": s.localBuildAvailable() && s.currentUserID(r) == "",
+		"github": s.health.get(methodGitHub),
+		"server": map[string]any{
+			"available":      srv.Available,
+			"reason":         srv.Reason,
+			"checked_at":     srv.CheckedAt,
+			"login_required": s.currentUserID(r) == "",
+		},
 	})
 }
 
